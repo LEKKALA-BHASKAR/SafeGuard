@@ -296,11 +296,13 @@ export default function EnhancedSOSScreen({
         const verifiedContacts = userContacts.filter(c => c.verified);
         const allContacts = verifiedContacts.length > 0 ? verifiedContacts : userContacts;
         
-        await emergencyService.sendEmergencyAlert(
-          allContacts,
-          location,
-          userName
-        );
+        if (location) {
+          await emergencyService.sendEmergencyAlert(
+            allContacts,
+            location,
+            userName
+          );
+        }
 
         // Auto call primary contact if enabled
         if (autoCall) {

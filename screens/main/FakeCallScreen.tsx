@@ -69,7 +69,11 @@ export default function FakeCallScreen({ userId }: FakeCallScreenProps) {
         vibrate: true,
       };
 
-      const callId = await fakeCallService.scheduleFakeCall(config);
+      const callId = await fakeCallService.scheduleFakeCall(
+        config.callerName,
+        config.delaySeconds,
+        config.callerNumber
+      );
       setScheduledCallId(callId);
       setIsScheduled(true);
 
@@ -115,7 +119,9 @@ export default function FakeCallScreen({ userId }: FakeCallScreenProps) {
   const handleAnswerCall = async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      await fakeCallService.answerFakeCall();
+      if (activeCall) {
+        await fakeCallService.answerFakeCall(activeCall.id);
+      }
       checkActiveCall();
     } catch (error) {
       console.error('Error answering call:', error);
@@ -125,7 +131,9 @@ export default function FakeCallScreen({ userId }: FakeCallScreenProps) {
   const handleEndCall = async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await fakeCallService.endFakeCall();
+      if (activeCall) {
+        await fakeCallService.endFakeCall(activeCall.id);
+      }
       setActiveCall(null);
     } catch (error) {
       console.error('Error ending call:', error);
@@ -560,6 +568,13 @@ const styles = StyleSheet.create({
   },
   callerNameSelected: {
     color: '#E63946',
+  },
+  callerNumber: {
+    fontSize: 16,
+    color: '#fff',
+    opacity: 0.8,
+    marginTop: 8,
+    textAlign: 'center',
   },
   callerType: {
     fontSize: 10,

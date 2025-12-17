@@ -15,6 +15,7 @@ import i18n, { loadSavedLanguage } from './services/i18n';
 import authService from './services/authService';
 import networkService from './services/networkService';
 import { EmergencyContact } from './services/emergencyService';
+import { EnhancedEmergencyContact } from './screens/main/EnhancedContactsScreen';
 
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
@@ -41,7 +42,7 @@ export default function App() {
   const [showRegister, setShowRegister] = useState(false);
   const [userName, setUserName] = useState('User');
   const [userId, setUserId] = useState('');
-  const [emergencyContacts, setEmergencyContacts] = useState<any[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EnhancedEmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function App() {
     setShowRegister(false);
   };
 
-  const handleContactsChange = (contacts: EmergencyContact[]) => {
+  const handleContactsChange = (contacts: EnhancedEmergencyContact[]) => {
     setEmergencyContacts(contacts);
   };
 
@@ -162,7 +163,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <EnhancedSOSScreen userId={userId} />}
+            {() => <EnhancedSOSScreen userId={userId} userContacts={emergencyContacts} userName={userName} />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -174,7 +175,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <EnhancedContactsScreen userId={userId} />}
+            {() => <EnhancedContactsScreen onContactsChange={handleContactsChange} />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -234,7 +235,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <LocationSharingScreen userId={userId} />}
+            {() => <LocationSharingScreen />}
           </Tab.Screen>
 
           <Tab.Screen

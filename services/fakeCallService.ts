@@ -237,6 +237,38 @@ class FakeCallService {
     return Array.from(this.activeCalls.values());
   }
 
+  // Get single active call (for compatibility)
+  getActiveCall(): FakeCall | null {
+    const calls = this.getActiveCalls();
+    return calls.length > 0 ? calls[0] : null;
+  }
+
+  // Get custom callers (for now returns presets, can be extended)
+  async getCustomCallers(): Promise<Array<{ name: string; number: string }>> {
+    return this.getPresetCallers();
+  }
+
+  // Save custom caller (placeholder for future enhancement)
+  async saveCustomCaller(name: string, number: string): Promise<void> {
+    // This would save to AsyncStorage in a real implementation
+    this.presetCallers.push({ name, number });
+    console.log(`Custom caller saved: ${name} - ${number}`);
+  }
+
+  // Trigger quick fake call (alias for quickFakeCall)
+  async triggerQuickFakeCall(): Promise<string> {
+    return this.quickFakeCall(0);
+  }
+
+  // Cancel scheduled call (for first active call)
+  async cancelScheduledCall(): Promise<boolean> {
+    const calls = this.getActiveCalls();
+    if (calls.length > 0) {
+      return this.cancelFakeCall(calls[0].id);
+    }
+    return false;
+  }
+
   // Cleanup
   async cleanup(): Promise<void> {
     // Cancel all timeouts
