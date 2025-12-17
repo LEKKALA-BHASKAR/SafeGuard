@@ -169,6 +169,8 @@ class PanicRecordingService {
       }
 
       // Read file as blob (File class implements Blob interface)
+      // session.fileUri is a file:// URI from Audio.Recording.getURI()
+      // The File constructor accepts URIs as strings
       const file = new File(session.fileUri);
       const blob = file.slice(0, file.size, 'audio/m4a');
 
@@ -209,6 +211,8 @@ class PanicRecordingService {
     }
 
     try {
+      // session.fileUri is a file:// URI from Audio.Recording.getURI()
+      // The File constructor accepts URIs as strings
       const file = new File(session.fileUri);
       await file.delete();
       this.activeSessions.delete(sessionId);
