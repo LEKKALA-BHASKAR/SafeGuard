@@ -142,6 +142,16 @@ class EmergencyService {
       return false;
     }
   }
+
+  // Alias for triggerEmergencyAlert for compatibility
+  async sendEmergencyAlert(
+    contacts: EmergencyContact[],
+    location: LocationData,
+    userName: string,
+    shouldCall: boolean = false
+  ): Promise<void> {
+    return this.triggerEmergencyAlert(contacts, location, userName, shouldCall);
+  }
 }
 
 export default new EmergencyService();

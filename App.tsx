@@ -8,10 +8,14 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { I18nextProvider } from 'react-i18next';
 import i18n, { loadSavedLanguage } from './services/i18n';
 import authService from './services/authService';
 import networkService from './services/networkService';
+import { EmergencyContact } from './services/emergencyService';
+import { EnhancedEmergencyContact } from './screens/main/EnhancedContactsScreen';
 
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
@@ -31,14 +35,14 @@ import SettingsScreen from './screens/main/SettingsScreen';
 import LocationSharingScreen from './screens/premium/LocationSharingScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [userName, setUserName] = useState('User');
   const [userId, setUserId] = useState('');
-  const [emergencyContacts, setEmergencyContacts] = useState<any[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EnhancedEmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export default function App() {
     setShowRegister(false);
   };
 
-  const handleContactsChange = (contacts: EmergencyContact[]) => {
+  const handleContactsChange = (contacts: EnhancedEmergencyContact[]) => {
     setEmergencyContacts(contacts);
   };
 
@@ -159,7 +163,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <EnhancedSOSScreen userId={userId} />}
+            {() => <EnhancedSOSScreen userId={userId} userContacts={emergencyContacts} userName={userName} />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -171,7 +175,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <EnhancedContactsScreen userId={userId} />}
+            {() => <EnhancedContactsScreen onContactsChange={handleContactsChange} />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -231,7 +235,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <LocationSharingScreen userId={userId} />}
+            {() => <LocationSharingScreen />}
           </Tab.Screen>
 
           <Tab.Screen
