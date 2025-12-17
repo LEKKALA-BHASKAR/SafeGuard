@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED: Fake Call Service
+ * This feature has been removed from the app navigation.
+ * Service kept for backward compatibility only.
+ */
+
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { Vibration, Platform } from 'react-native';
@@ -243,22 +249,16 @@ class FakeCallService {
     return calls.length > 0 ? calls[0] : null;
   }
 
-  // Get custom callers (currently returns presets - custom caller persistence not yet implemented)
-  // TODO: Implement AsyncStorage persistence for user-added custom callers
+  // Get custom callers (DEPRECATED - returns presets only)
   async getCustomCallers(): Promise<Array<{ name: string; number: string }>> {
-    // For now, return preset callers
-    // In future: Load from AsyncStorage and merge with presets
+    // Feature deprecated - returns preset callers only
     return this.getPresetCallers();
   }
 
-  // Save custom caller (temporary - not persisted)
-  // TODO: Implement AsyncStorage persistence to save custom callers permanently
+  // Save custom caller (DEPRECATED - no-op)
   async saveCustomCaller(name: string, number: string): Promise<void> {
-    // Warning: This is temporary storage only - callers are lost on app restart
-    // In a production implementation, save to AsyncStorage
-    this.presetCallers.push({ name, number });
-    console.log(`Custom caller saved (temporary): ${name} - ${number}`);
-    console.warn('Custom callers are not persisted and will be lost on app restart');
+    // Feature deprecated - no longer saves custom callers
+    console.warn('FakeCall feature is deprecated. Custom callers not supported.');
   }
 
   // Trigger quick fake call (alias for quickFakeCall)

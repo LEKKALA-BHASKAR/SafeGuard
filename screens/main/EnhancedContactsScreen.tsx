@@ -1,29 +1,27 @@
 /**
  * Enhanced ContactsScreen - Premium emergency contacts with verification
- * Features: OTP verification, contact roles, favorites, quick actions
+ * Features: OTP verification, contact roles, favorites, Firebase sync
  */
 
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
 import * as Contacts from 'expo-contacts';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import firebaseContactsService from '../../services/firebaseContactsService';
 import otpService from '../../services/otpService';
-
-const CONTACTS_KEY = 'emergency_contacts';
 
 export interface EnhancedEmergencyContact {
   id: string;
@@ -55,6 +53,10 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   
+  // Import state
+  const [deviceContacts, setDeviceContacts] = useState<Contacts.Contact[]>([]);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  
   // Form state
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -68,33 +70,59 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
   const [otpSent, setOtpSent] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  // Search & Refresh state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
-    loadContacts();
+    initializeContacts();
   }, []);
 
-  const loadContacts = async () => {
+  const initializeContacts = async () => {
     try {
-      const stored = await AsyncStorage.getItem(CONTACTS_KEY);
-      if (stored) {
-        const parsedContacts: EnhancedEmergencyContact[] = JSON.parse(stored);
-        setContacts(parsedContacts);
-        onContactsChange?.(parsedContacts);
-      }
+      // Initialize Firebase contacts service (auto-migrates from local storage)
+      await firebaseContactsService.initialize();
+      await loadContacts();
     } catch (error) {
-      console.error('Error loading contacts:', error);
-    } finally {
+      console.error('Error initializing contacts:', error);
+      Alert.alert('Initialization Error', 'Failed to initialize contacts service');
       setLoading(false);
     }
   };
 
-  const saveContacts = async (newContacts: EnhancedEmergencyContact[]) => {
+  const loadContacts = async () => {
     try {
-      await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(newContacts));
-      setContacts(newContacts);
-      onContactsChange?.(newContacts);
+      const firebaseContacts = await firebaseContactsService.getUserContacts();
+      setContacts(firebaseContacts);
+      onContactsChange?.(firebaseContacts);
     } catch (error) {
-      console.error('Error saving contacts:', error);
-      Alert.alert(t('error'), 'Failed to save contacts');
+      console.error('Error loading contacts:', error);
+      Alert.alert('Error', 'Failed to load contacts. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadContacts();
+  };
+
+  const saveContact = async (contact: EnhancedEmergencyContact, isUpdate: boolean = false) => {
+    try {
+      if (isUpdate) {
+        await firebaseContactsService.updateContact(contact.id, contact);
+      } else {
+        // Remove id before adding since service will generate it
+        const { id, ...contactWithoutId } = contact;
+        await firebaseContactsService.addContact(contactWithoutId);
+      }
+      await loadContacts(); // Reload to get latest from Firebase
+    } catch (error) {
+      console.error('Error saving contact:', error);
+      Alert.alert('Error', 'Failed to save contact. Please try again.');
+      throw error;
     }
   };
 
@@ -110,7 +138,9 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
   };
 
   const openEditContactModal = (contact: EnhancedEmergencyContact) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     setEditingContact(contact);
     setName(contact.name);
     setPhoneNumber(contact.phoneNumber);
@@ -162,39 +192,52 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
     saveNewContact(contacts);
   };
 
-  const saveNewContact = (existingContacts: EnhancedEmergencyContact[]) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    if (editingContact) {
-      // Update existing contact
-      const updatedContacts = existingContacts.map((c) =>
-        c.id === editingContact.id
-          ? { ...c, name, phoneNumber, relationship, role, email, notes }
-          : c
-      );
-      saveContacts(updatedContacts);
-    } else {
-      // Add new contact
-      const newContact: EnhancedEmergencyContact = {
-        id: Date.now().toString(),
-        name,
-        phoneNumber,
-        relationship,
-        role,
-        verified: false,
-        favorite: false,
-        email,
-        notes,
-        addedAt: Date.now(),
-      };
-      saveContacts([...existingContacts, newContact]);
-    }
+  const saveNewContact = async (existingContacts: EnhancedEmergencyContact[]) => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      if (editingContact) {
+        // Update existing contact in Firebase
+        const updatedContact: EnhancedEmergencyContact = {
+          ...editingContact,
+          name,
+          phoneNumber,
+          relationship,
+          role,
+          email,
+          notes,
+        };
+        await saveContact(updatedContact, true);
+      } else {
+        // Add new contact to Firebase
+        const newContact: EnhancedEmergencyContact = {
+          id: Date.now().toString(),
+          name,
+          phoneNumber,
+          relationship,
+          role,
+          verified: false,
+          favorite: false,
+          email,
+          notes,
+          addedAt: Date.now(),
+        };
+        await saveContact(newContact, false);
+      }
 
-    setModalVisible(false);
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Error in saveNewContact:', error);
+      // Modal stays open so user can retry
+    }
   };
 
   const handleDeleteContact = (contact: EnhancedEmergencyContact) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     
     Alert.alert(
       'Delete Contact',
@@ -204,10 +247,17 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
         {
           text: t('delete'),
           style: 'destructive',
-          onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            const updatedContacts = contacts.filter((c) => c.id !== contact.id);
-            saveContacts(updatedContacts);
+          onPress: async () => {
+            try {
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+              await firebaseContactsService.deleteContact(contact.id);
+              await loadContacts();
+            } catch (error) {
+              console.error('Error deleting contact:', error);
+              Alert.alert('Error', 'Failed to delete contact. Please try again.');
+            }
           },
         },
       ]
@@ -225,7 +275,9 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
     if (!verifyingContact) return;
 
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
       const result = await otpService.sendOTP(verifyingContact.phoneNumber, 'verification');
       
       if (result.success) {
@@ -245,25 +297,30 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
 
     try {
       setVerifying(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
       
       const result = await otpService.verifyOTP(verifyingContact.phoneNumber, otpCode);
       
       if (result.success) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
         
-        // Update contact verification status
-        const updatedContacts = contacts.map((c) =>
-          c.id === verifyingContact.id
-            ? { ...c, verified: true, verifiedAt: Date.now() }
-            : c
+        // Update contact verification status in Firebase
+        await firebaseContactsService.markContactAsVerified(
+          verifyingContact.id,
+          verifyingContact.phoneNumber
         );
-        saveContacts(updatedContacts);
+        await loadContacts();
         
         setVerifyModalVisible(false);
         Alert.alert(t('success'), 'Contact verified successfully!');
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
         Alert.alert(t('error'), result.message);
       }
     } catch (error) {
@@ -274,12 +331,17 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
     }
   };
 
-  const handleToggleFavorite = (contact: EnhancedEmergencyContact) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const updatedContacts = contacts.map((c) =>
-      c.id === contact.id ? { ...c, favorite: !c.favorite } : c
-    );
-    saveContacts(updatedContacts);
+  const handleToggleFavorite = async (contact: EnhancedEmergencyContact) => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      await firebaseContactsService.toggleFavorite(contact.id, contact.favorite);
+      await loadContacts();
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Error', 'Failed to update favorite status.');
+    }
   };
 
   const handleImportFromContacts = async () => {
@@ -292,19 +354,21 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
       }
 
       setImporting(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
 
       const { data } = await Contacts.getContactsAsync({
         fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
       });
 
       if (data.length > 0) {
-        // Show contact picker
-        Alert.alert(
-          'Import Contact',
-          `Found ${data.length} contacts. This feature will show a picker in the next update.`,
-          [{ text: 'OK' }]
-        );
+        // Filter contacts that have phone numbers
+        const validContacts = data.filter(c => c.phoneNumbers && c.phoneNumbers.length > 0);
+        setDeviceContacts(validContacts.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+        setImportModalVisible(true);
+      } else {
+        Alert.alert('No Contacts', 'No contacts found on your device.');
       }
     } catch (error) {
       console.error('Error importing contacts:', error);
@@ -312,6 +376,37 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
     } finally {
       setImporting(false);
     }
+  };
+
+  const handleCall = (phoneNumber: string) => {
+    Linking.openURL(`tel:${phoneNumber}`);
+  };
+
+  const handleMessage = (phoneNumber: string) => {
+    Linking.openURL(`sms:${phoneNumber}`);
+  };
+
+  const handleSelectDeviceContact = (contact: Contacts.Contact) => {
+    setImportModalVisible(false);
+    
+    // Extract details
+    const contactName = contact.name || '';
+    const contactPhone = contact.phoneNumbers?.[0]?.number || '';
+    const contactEmail = contact.emails?.[0]?.email || '';
+    
+    // Pre-fill add modal
+    setEditingContact(null);
+    setName(contactName);
+    setPhoneNumber(contactPhone);
+    setRelationship('');
+    setRole('secondary');
+    setEmail(contactEmail);
+    setNotes('');
+    
+    // Open add modal after a short delay to allow import modal to close
+    setTimeout(() => {
+      setModalVisible(true);
+    }, 500);
   };
 
   const renderContact = ({ item }: { item: EnhancedEmergencyContact }) => (
@@ -375,6 +470,27 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
       >
         <Text style={styles.deleteButtonText}>🗑️</Text>
       </TouchableOpacity>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity 
+          style={styles.quickActionBtn} 
+          onPress={() => handleCall(item.phoneNumber)}
+        >
+          <Text style={styles.quickActionIcon}>📞</Text>
+          <Text style={styles.quickActionText}>Call</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.verticalDivider} />
+        
+        <TouchableOpacity 
+          style={styles.quickActionBtn} 
+          onPress={() => handleMessage(item.phoneNumber)}
+        >
+          <Text style={styles.quickActionIcon}>💬</Text>
+          <Text style={styles.quickActionText}>Message</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -387,7 +503,13 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
     );
   }
 
-  return (
+  if (loading) {
+    return (
+  const filteredContacts = contacts.filter(contact => 
+    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    contact.phoneNumber.includes(searchQuery) ||
+    contact.relationship.toLowerCase().includes(searchQuery.toLowerCase())
+  );eturn (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -395,20 +517,33 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
         <Text style={styles.headerSubtitle}>
           {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} added
         </Text>
+        
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search contacts..."
+            placeholderTextColor="rgba(255,255,255,0.7)"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+          />
+        </View>
       </View>
 
       {/* Contacts List */}
-      {contacts.length === 0 ? (
+      {filteredContacts.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>👥</Text>
-          <Text style={styles.emptyTitle}>No Emergency Contacts</Text>
+          <Text style={styles.emptyIcon}>{searchQuery ? '🔍' : '👥'}</Text>
+          <Text style={styles.emptyTitle}>{searchQuery ? 'No Results Found' : 'No Emergency Contacts'}</Text>
           <Text style={styles.emptyText}>
-            Add trusted contacts who will be notified during emergencies
+            {searchQuery ? `No contacts matching "${searchQuery}"` : 'Add trusted contacts who will be notified during emergencies'}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={contacts.sort((a, b) => {
+          data={filteredContacts.sort((a, b) => {
             // Sort: favorites first, then by role, then by name
             if (a.favorite && !b.favorite) return -1;
             if (!a.favorite && b.favorite) return 1;
@@ -423,7 +558,13 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
           renderItem={renderContact}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
           showsVerticalScrollIndicator={false}
+          style={styles.flatList}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E63946" />
+          }
         />
       )}
 
@@ -621,6 +762,50 @@ export default function EnhancedContactsScreen({ onContactsChange }: ContactsScr
           </View>
         </View>
       </Modal>
+
+      {/* Import Contacts Modal */}
+      <Modal
+        visible={importModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setImportModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalHeaderTitle}>Select Contact</Text>
+            <TouchableOpacity 
+              onPress={() => setImportModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <FlatList
+            data={deviceContacts}
+            keyExtractor={(item) => item.id || Math.random().toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={styles.importContactItem}
+                onPress={() => handleSelectDeviceContact(item)}
+              >
+                <View style={styles.importAvatar}>
+                  <Text style={styles.importAvatarText}>
+                    {(item.name || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.importInfo}>
+                  <Text style={styles.importName}>{item.name || 'Unknown'}</Text>
+                  <Text style={styles.importPhone}>
+                    {item.phoneNumbers?.[0]?.number || 'No number'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -629,6 +814,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  flatList: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -655,6 +843,26 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginTop: 16,
+    height: 44,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 16,
+    height: '100%',
   },
   emptyContainer: {
     flex: 1,
@@ -1011,5 +1219,93 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     fontWeight: '500',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#F8F9FA',
+  },
+  modalHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#E63946',
+    fontWeight: '600',
+  },
+  importContactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  importAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  importAvatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+  },
+  importInfo: {
+    flex: 1,
+  },
+  importName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  importPhone: {
+    fontSize: 14,
+    color: '#666',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginLeft: 68,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    gap: 8,
+  },
+  quickActionIcon: {
+    fontSize: 16,
+  },
+  quickActionText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  verticalDivider: {
+    width: 1,
+    backgroundColor: '#F0F0F0',
   },
 });

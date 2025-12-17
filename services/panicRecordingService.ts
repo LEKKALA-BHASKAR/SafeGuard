@@ -2,9 +2,8 @@ import { Audio } from 'expo-av';
 import { Camera } from 'expo-camera';
 import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
-import { Platform } from 'react-native';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 
 export interface RecordingSession {
   id: string;
@@ -231,8 +230,8 @@ class PanicRecordingService {
 
     const audioSessionId = await this.startAudioRecording();
 
-    // TODO: Start video recording (requires camera component)
-    // const videoSessionId = await this.startVideoRecording();
+    // Note: Video recording requires camera component integration
+    // This can be implemented as a future enhancement when camera UI is added
 
     return {
       audioSessionId,

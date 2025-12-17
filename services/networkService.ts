@@ -3,8 +3,10 @@
  * Ensures the app works even with poor or no internet connection
  */
 
-import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import emergencyService from './emergencyService';
+import smsService from './smsService';
 
 export interface NetworkStatus {
   isConnected: boolean;
@@ -172,16 +174,55 @@ class NetworkService {
    * Send a queued alert
    */
   private async sendQueuedAlert(alert: QueuedAlert): Promise<boolean> {
-    // This method should be implemented based on your alert sending logic
-    // For now, return true to simulate successful sending
-    console.log(`Sending queued alert: ${alert.id} (${alert.type})`);
-    
-    // TODO: Implement actual sending logic based on alert type
-    // - SOS: Send emergency alert
-    // - LOCATION: Share location
-    // - MESSAGE: Send message
-    
-    return true;
+    try {
+      console.log(`Sending queued alert: ${alert.id} (${alert.type})`);
+      
+      switch (alert.type) {
+        case 'SOS':
+          // Send emergency SOS alert
+          await emergencyService.triggerEmergencyAlert(
+            alert.data.contacts || [],
+            alert.data.location || null,
+            alert.data.silentMode || false,
+            alert.data.audioUri
+          );
+          return true;
+
+        case 'LOCATION':
+          // Share location
+          if (alert.data.location) {
+            const shareMessage = `Current Location: https://maps.google.com/?q=${alert.data.location.latitude},${alert.data.location.longitude}`;
+            
+            // Send via SMS to contacts
+            if (alert.data.contacts && alert.data.contacts.length > 0) {
+              for (const contact of alert.data.contacts) {
+                await smsService.sendSMS(
+                  contact.phone,
+                  shareMessage
+                );
+              }
+            }
+          }
+          return true;
+
+        case 'MESSAGE':
+          // Send message via SMS
+          if (alert.data.to && alert.data.message) {
+            await smsService.sendSMS(
+              alert.data.to,
+              alert.data.message
+            );
+          }
+          return true;
+
+        default:
+          console.warn(`Unknown alert type: ${alert.type}`);
+          return false;
+      }
+    } catch (error) {
+      console.error('Error sending queued alert:', error);
+      return false;
+    }
   }
 
   /**

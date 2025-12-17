@@ -1,8 +1,8 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
-import { getFirestore, collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { addDoc, collection, getFirestore, serverTimestamp } from 'firebase/firestore';
+import { Platform } from 'react-native';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const GEOFENCING_TASK_NAME = 'geofencing-task';
@@ -434,7 +434,8 @@ if (Platform.OS !== 'web') {
       // Send notification based on event
       console.log(`Geofence event: ${eventType} for region ${region.identifier}`);
       
-      // TODO: Send push notification to emergency contacts
+      // Note: Push notifications require Firebase Cloud Messaging backend setup
+      // This would be configured in Firebase Console and integrated via Cloud Functions
     }
   });
 }

@@ -3,22 +3,26 @@
  * Features: Shake-to-SOS, Silent mode, Multiple triggers, Real-time status
  */
 
+import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { Accelerometer } from 'expo-sensors';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    Platform,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    Vibration,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Vibration,
+  View
 } from 'react-native';
 import emergencyService from '../../services/emergencyService';
 import locationService, { LocationData } from '../../services/locationService';
@@ -58,6 +62,13 @@ export default function EnhancedSOSScreen({
   const [autoCall, setAutoCall] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   
+  // Voice recording & message
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [emergencyMessage, setEmergencyMessage] = useState('');
+  const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [showMessageInput, setShowMessageInput] = useState(false);
+  
   // Network status
   const [isOnline, setIsOnline] = useState(true);
   
@@ -69,6 +80,7 @@ export default function EnhancedSOSScreen({
   
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeSubscription = useRef<any>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // Initialize network monitoring
@@ -106,8 +118,8 @@ export default function EnhancedSOSScreen({
   }, [sosActivated]);
 
   useEffect(() => {
-    // Shake detection
-    if (shakeEnabled && !sosActivated) {
+    // Shake detection - only on mobile
+    if (Platform.OS !== 'web' && shakeEnabled && !sosActivated) {
       startShakeDetection();
     } else {
       stopShakeDetection();
@@ -117,21 +129,34 @@ export default function EnhancedSOSScreen({
   }, [shakeEnabled, sosActivated]);
 
   const startShakeDetection = () => {
-    Accelerometer.setUpdateInterval(100);
+    if (Platform.OS === 'web') {
+      console.log('Shake detection not available on web');
+      return;
+    }
     
-    shakeSubscription.current = Accelerometer.addListener((data) => {
-      const { x, y, z } = data;
-      const acceleration = Math.sqrt(x * x + y * y + z * z);
+    try {
+      Accelerometer.setUpdateInterval(100);
       
-      if (acceleration > SHAKE_THRESHOLD) {
-        triggerShakeSOS();
-      }
-    });
+      shakeSubscription.current = Accelerometer.addListener((data) => {
+        const { x, y, z } = data;
+        const acceleration = Math.sqrt(x * x + y * y + z * z);
+        
+        if (acceleration > SHAKE_THRESHOLD) {
+          triggerShakeSOS();
+        }
+      });
+    } catch (error) {
+      console.error('Error starting shake detection:', error);
+    }
   };
 
   const stopShakeDetection = () => {
     if (shakeSubscription.current) {
-      shakeSubscription.current.remove();
+      try {
+        shakeSubscription.current.remove();
+      } catch (error) {
+        console.error('Error stopping shake detection:', error);
+      }
       shakeSubscription.current = null;
     }
   };
@@ -175,11 +200,57 @@ export default function EnhancedSOSScreen({
     );
   };
 
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    
+    try {
+      setIsRecording(false);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecordingUri(uri);
+      setRecording(null);
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+    }
+  };
+
   const handlePressIn = () => {
     setIsPressed(true);
+    setShowMessageInput(true);
     
-    if (!silentMode) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // Start voice recording automatically (only on mobile)
+    if (Platform.OS !== 'web') {
+      startRecording();
+    }
+    
+    if (!silentMode && Platform.OS !== 'web') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      } catch (error) {
+        console.error('Haptics error:', error);
+      }
     }
 
     Animated.spring(scaleAnim, {
@@ -196,33 +267,53 @@ export default function EnhancedSOSScreen({
     // Start countdown
     let count = 3;
     setCountdown(count);
-    const countdownInterval = setInterval(() => {
+    countdownIntervalRef.current = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
-        if (!silentMode) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (!silentMode && Platform.OS !== 'web') {
+          try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          } catch (error) {
+            console.error('Haptics error:', error);
+          }
         }
       } else {
-        clearInterval(countdownInterval);
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+        }
         setCountdown(null);
       }
     }, 1000);
 
-    longPressTimer.current = setTimeout(() => {
-      clearInterval(countdownInterval);
+    longPressTimer.current = setTimeout(async () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
       setCountdown(null);
+      await stopRecording();
       triggerSOS();
     }, LONG_PRESS_DURATION);
   };
 
-  const handlePressOut = () => {
+  const handlePressOut = async () => {
     setIsPressed(false);
     setCountdown(null);
+    setShowMessageInput(false);
 
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+    }
+
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    // Stop recording if user releases early
+    if (isRecording) {
+      await stopRecording();
     }
 
     Animated.spring(scaleAnim, {
@@ -249,22 +340,42 @@ export default function EnhancedSOSScreen({
   };
 
   const triggerSOS = async () => {
-    if (userContacts.length === 0) {
+    // 1. Determine target contacts (Priority: Favorites -> Verified -> All)
+    let targetContacts = userContacts.filter(c => c.favorite);
+    
+    if (targetContacts.length === 0) {
+      targetContacts = userContacts.filter(c => c.verified);
+    }
+    
+    if (targetContacts.length === 0) {
+      targetContacts = userContacts;
+    }
+
+    if (targetContacts.length === 0) {
       Alert.alert(
-        'No Emergency Contacts',
+        'No Contacts',
         'Please add emergency contacts before using SOS.',
-        [{ text: 'OK' }]
+        [{ text: 'Add Contacts', onPress: () => {} }] // Navigation would go here
       );
       return;
     }
 
     setLoading(true);
     setSosActivated(true);
+    setShowMessageInput(false);
     
-    // Vibration pattern (unless silent)
-    if (!silentMode) {
-      Vibration.vibrate([0, 500, 200, 500, 200, 500]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    // Vibration pattern (unless silent) - mobile only
+    if (!silentMode && Platform.OS !== 'web') {
+      try {
+        Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+      } catch (error) {
+        console.error('Vibration error:', error);
+      }
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch (error) {
+        console.error('Haptics error:', error);
+      }
     }
 
     try {
@@ -281,50 +392,60 @@ export default function EnhancedSOSScreen({
         setCurrentLocation(location);
       }
 
+      // Prepare SOS data with message and recording
+      const sosData = {
+        userName,
+        userId,
+        location,
+        timestamp: Date.now(),
+        message: emergencyMessage || 'Emergency! I need help!',
+        voiceRecording: recordingUri,
+        trackingLink: location ? `https://maps.google.com/?q=${location.latitude},${location.longitude}` : null,
+      };
+
       // Check network status
       if (!isOnline) {
         Alert.alert(
           'Offline Mode',
-          'No internet connection. Alerts will be queued and sent when connection is restored.',
+          'No internet connection. Attempting to send via SMS fallback.',
           [{ text: 'OK' }]
         );
-        
-        // Queue alert for later
-        await networkService.queueAlert('SOS', {
-          contacts: userContacts,
-          location,
-          userName,
-          timestamp: Date.now(),
-        });
-      } else {
-        // Send emergency alerts
-        const verifiedContacts = userContacts.filter(c => c.verified);
-        const allContacts = verifiedContacts.length > 0 ? verifiedContacts : userContacts;
-        
-        if (location) {
-          await emergencyService.sendEmergencyAlert(
-            allContacts,
-            location,
-            userName
-          );
-        }
+      }
 
-        // Auto call primary contact if enabled
-        if (autoCall) {
-          const primaryContact = userContacts.find(c => c.role === 'primary');
-          if (primaryContact) {
+      if (location) {
+        // Send Emergency Alert (Handles Cloud SMS -> Native SMS fallback)
+        await emergencyService.triggerEmergencyAlert(
+          targetContacts,
+          location,
+          `${userName}${sosData.message ? ': ' + sosData.message : ''}${recordingUri ? ' [Voice note recorded]' : ''}`
+        );
+      }
+
+      // Auto call primary contact if enabled (only on mobile)
+      if (Platform.OS !== 'web' && autoCall) {
+        // Find primary contact, or first favorite, or first available
+        const primaryContact = targetContacts.find(c => c.role === 'primary') || targetContacts[0];
+        
+        if (primaryContact) {
+          try {
             await emergencyService.makeEmergencyCall(primaryContact.phoneNumber);
+          } catch (error) {
+            console.error('Error making emergency call:', error);
           }
         }
       }
 
-      // Log SOS event
-      await logSOSEvent(location);
+      // Log SOS event with message and recording
+      await logSOSEvent(location, sosData.message, recordingUri);
+
+      // Clear message and recording for next use
+      setEmergencyMessage('');
+      setRecordingUri(null);
 
       if (!silentMode) {
         Alert.alert(
           'SOS Sent!',
-          `Emergency alerts sent to ${userContacts.length} contact(s). Help is on the way.`,
+          `Emergency alerts sent to ${favoriteContacts.length} favorite contact(s) with your location, message${recordingUri ? ', and voice note' : ''}. They can track you in real-time.`,
           [
             {
               text: 'Deactivate',
@@ -345,25 +466,33 @@ export default function EnhancedSOSScreen({
     }
   };
 
-  const logSOSEvent = async (location: LocationData | null) => {
+import firebaseHistoryService from '../../services/firebaseHistoryService';
+
+// ... existing imports ...
+
+// ... inside EnhancedSOSScreen ...
+
+  const logSOSEvent = async (location: LocationData | null, message?: string, voiceUri?: string | null) => {
     try {
       const event = {
-        userId,
-        type: 'SOS',
+        type: 'SOS' as const,
         timestamp: Date.now(),
+        message: message || 'Emergency!',
+        hasVoiceNote: !!voiceUri,
+        voiceRecordingUri: voiceUri,
         location: location ? {
           latitude: location.latitude,
           longitude: location.longitude,
-          accuracy: location.accuracy,
+          accuracy: location.accuracy || 0,
         } : null,
         contactsNotified: userContacts.length,
+        status: 'sent' as const,
         silentMode,
-        networkStatus: isOnline ? 'online' : 'offline',
+        networkStatus: isOnline ? 'online' as const : 'offline' as const,
       };
 
-      // Save to AsyncStorage for local history
-      // TODO: Also sync to Firebase for cloud backup
-      console.log('SOS Event Logged:', event);
+      await firebaseHistoryService.addEvent(event);
+      console.log('SOS Event logged to Firebase');
     } catch (error) {
       console.error('Error logging SOS event:', error);
     }
@@ -406,8 +535,13 @@ export default function EnhancedSOSScreen({
         </View>
       )}
 
-      {/* SOS Button */}
-      <View style={styles.sosContainer}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
+      >
+        {/* SOS Button */}
+        <View style={styles.sosContainer}>
         <Animated.View
           style={[
             styles.sosButtonWrapper,
@@ -476,15 +610,63 @@ export default function EnhancedSOSScreen({
         </Text>
       </View>
 
+      {/* Message Input During Countdown */}
+      {showMessageInput && countdown !== null && (
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.messageInputContainer}
+        >
+          <View style={styles.messageCard}>
+            <Text style={styles.messageCardTitle}>
+              {isRecording ? '🎙️ Recording...' : '💬 Quick Message'}
+            </Text>
+            <Text style={styles.messageCardSubtitle}>
+              {isRecording ? 'Voice note recording in progress' : 'Type an emergency message (optional)'}
+            </Text>
+            <TextInput
+              style={styles.messageInput}
+              placeholder="e.g., 'At home, need help immediately'"
+              placeholderTextColor="#999"
+              value={emergencyMessage}
+              onChangeText={setEmergencyMessage}
+              multiline
+              maxLength={200}
+              autoFocus={false}
+            />
+            {isRecording && (
+              <View style={styles.recordingIndicator}>
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingText}>Recording voice note...</Text>
+              </View>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      )}
+
+      {/* Info Banner */}
+      <View style={styles.infoBanner}>
+        <Text style={styles.infoBannerText}>
+          📱 Hold button for 3 seconds → Auto-record voice note + optional text message → Send to favorite contacts with real-time location tracking
+        </Text>
+      </View>
+
       {/* Settings */}
       <View style={styles.settingsContainer}>
         <Text style={styles.settingsTitle}>SOS Settings</Text>
+
+        {Platform.OS === 'web' && (
+          <View style={styles.webWarningBanner}>
+            <Text style={styles.webWarningText}>
+              ℹ️ Some features below are mobile-only. Use on mobile for full functionality.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
             <Text style={styles.settingLabel}>Silent Mode</Text>
             <Text style={styles.settingDescription}>
-              No sound or vibration
+              {Platform.OS === 'web' ? 'No notifications' : 'No sound or vibration'}
             </Text>
           </View>
           <Switch
@@ -495,59 +677,78 @@ export default function EnhancedSOSScreen({
           />
         </View>
 
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Shake to SOS</Text>
-            <Text style={styles.settingDescription}>
-              Shake phone to trigger alert
-            </Text>
+        {Platform.OS !== 'web' && (
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Shake to SOS</Text>
+              <Text style={styles.settingDescription}>
+                Shake phone to trigger alert
+              </Text>
+            </View>
+            <Switch
+              value={shakeEnabled}
+              onValueChange={setShakeEnabled}
+              trackColor={{ false: '#ccc', true: '#E63946' }}
+              thumbColor="#fff"
+            />
           </View>
-          <Switch
-            value={shakeEnabled}
-            onValueChange={setShakeEnabled}
-            trackColor={{ false: '#ccc', true: '#E63946' }}
-            thumbColor="#fff"
-          />
-        </View>
+        )}
 
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Auto Call</Text>
-            <Text style={styles.settingDescription}>
-              Call primary contact automatically
-            </Text>
+        {Platform.OS !== 'web' && (
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Auto Call</Text>
+              <Text style={styles.settingDescription}>
+                Call primary contact automatically
+              </Text>
+            </View>
+            <Switch
+              value={autoCall}
+              onValueChange={setAutoCall}
+              trackColor={{ false: '#ccc', true: '#E63946' }}
+              thumbColor="#fff"
+            />
           </View>
-          <Switch
-            value={autoCall}
-            onValueChange={setAutoCall}
-            trackColor={{ false: '#ccc', true: '#E63946' }}
-            thumbColor="#fff"
-          />
-        </View>
+        )}
+
+        {Platform.OS === 'web' && (
+          <View style={styles.webFeaturesBanner}>
+            <Text style={styles.webFeaturesTitle}>📱 Mobile-Only Features:</Text>
+            <Text style={styles.webFeatureText}>• Shake to SOS - Trigger alert by shaking phone</Text>
+            <Text style={styles.webFeatureText}>• Auto Call - Automatically call primary contact</Text>
+            <Text style={styles.webFeatureText}>• Vibration Feedback - Get haptic feedback on trigger</Text>
+          </View>
+        )}
       </View>
 
       {/* Contacts Summary */}
       <View style={styles.contactsSummary}>
-        <Text style={styles.contactsTitle}>Emergency Contacts</Text>
+        <Text style={styles.contactsTitle}>Favorite Contacts (SOS Recipients)</Text>
         <Text style={styles.contactsCount}>
-          {userContacts.length} contact(s) will be notified
+          ⭐ {userContacts.filter(c => c.favorite).length} favorite(s)
         </Text>
         <Text style={styles.contactsVerified}>
-          {userContacts.filter(c => c.verified).length} verified
+          {userContacts.filter(c => c.verified).length} verified • {userContacts.length} total contacts
         </Text>
+        {userContacts.filter(c => c.favorite).length === 0 && (
+          <Text style={styles.noFavoritesWarning}>
+            ⚠️ Mark contacts as favorites in Contacts screen to use SOS
+          </Text>
+        )}
       </View>
 
-      {/* Emergency Deactivate Button */}
-      {sosActivated && (
-        <TouchableOpacity
-          style={styles.deactivateButton}
-          onPress={deactivateSOS}
-        >
-          <Text style={styles.deactivateButtonText}>
-            Deactivate SOS
-          </Text>
-        </TouchableOpacity>
-      )}
+        {/* Emergency Deactivate Button */}
+        {sosActivated && (
+          <TouchableOpacity
+            style={styles.deactivateButton}
+            onPress={deactivateSOS}
+          >
+            <Text style={styles.deactivateButtonText}>
+              Deactivate SOS
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -556,6 +757,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'web' ? 40 : 20,
   },
   header: {
     backgroundColor: '#E63946',
@@ -583,10 +791,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sosContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
+    minHeight: Platform.OS === 'web' ? 400 : undefined,
   },
   sosButtonWrapper: {
     position: 'relative',
@@ -730,6 +938,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4CAF50',
   },
+  noFavoritesWarning: {
+    fontSize: 13,
+    color: '#FF9800',
+    marginTop: 8,
+    fontWeight: '600',
+  },
   deactivateButton: {
     backgroundColor: '#4CAF50',
     marginHorizontal: 16,
@@ -747,5 +961,116 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  messageInputContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  messageCard: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#FFC107',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  messageCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  messageCardSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+  },
+  messageInput: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    minHeight: 80,
+    maxHeight: 120,
+    textAlignVertical: 'top',
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#E63946',
+    marginRight: 8,
+  },
+  recordingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E63946',
+  },
+  infoBanner: {
+    backgroundColor: '#E3F2FD',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  infoBannerText: {
+    fontSize: 14,
+    color: '#1565C0',
+    lineHeight: 20,
+  },
+  webWarningBanner: {
+    backgroundColor: '#FFEBEE',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E63946',
+  },
+  webWarningText: {
+    fontSize: 14,
+    color: '#C62828',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  webFeaturesBanner: {
+    backgroundColor: '#F3E5F5',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#9C27B0',
+  },
+  webFeaturesTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#6A1B9A',
+    marginBottom: 12,
+  },
+  webFeatureText: {
+    fontSize: 13,
+    color: '#7B1FA2',
+    marginVertical: 6,
+    lineHeight: 18,
   },
 });

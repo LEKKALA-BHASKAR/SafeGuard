@@ -1,34 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, { useEffect, useState } from 'react';
+import { I18nextProvider } from 'react-i18next';
 import {
-  View,
-  StyleSheet,
   Platform,
   StatusBar,
-  Text,
+  StyleSheet,
+  View
 } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { I18nextProvider } from 'react-i18next';
-import i18n, { loadSavedLanguage } from './services/i18n';
-import authService from './services/authService';
-import networkService from './services/networkService';
-import { EmergencyContact } from './services/emergencyService';
 import { EnhancedEmergencyContact } from './screens/main/EnhancedContactsScreen';
+import authService from './services/authService';
+import i18n, { loadSavedLanguage } from './services/i18n';
+import networkService from './services/networkService';
 
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
 import RegisterScreen from './screens/auth/RegisterScreen';
 
 // Main Screens
-import HomeScreen from './screens/main/HomeScreen';
-import ProfileScreen from './screens/main/ProfileScreen';
+import EmergencyHistoryScreen from './screens/main/EmergencyHistoryScreen';
 import EnhancedContactsScreen from './screens/main/EnhancedContactsScreen';
 import EnhancedSOSScreen from './screens/main/EnhancedSOSScreen';
-import EmergencyHistoryScreen from './screens/main/EmergencyHistoryScreen';
+import HomeScreen from './screens/main/HomeScreen';
+import ProfileScreen from './screens/main/ProfileScreen';
 import SafeZonesScreen from './screens/main/SafeZonesScreen';
-import FakeCallScreen from './screens/main/FakeCallScreen';
 import SettingsScreen from './screens/main/SettingsScreen';
 
 // Premium Screens
@@ -187,7 +184,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <EmergencyHistoryScreen userId={userId} />}
+            {() => <EmergencyHistoryScreen />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -200,18 +197,6 @@ export default function App() {
             }}
           >
             {() => <SafeZonesScreen userId={userId} />}
-          </Tab.Screen>
-
-          <Tab.Screen
-            name="FakeCall"
-            options={{
-              tabBarLabel: 'Escape',
-              tabBarIcon: ({ color }) => (
-                <Ionicons name="call" size={24} color={color} />
-              ),
-            }}
-          >
-            {() => <FakeCallScreen userId={userId} />}
           </Tab.Screen>
 
           <Tab.Screen
@@ -268,7 +253,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sosTabIcon: {
-    backgroundColor: '#E63946',
+    backgroundColor: '#4fddefff',
     transform: [{ scale: 1.2 }],
   },
   icon: {

@@ -1,9 +1,4 @@
-/**
- * Emergency History Screen - Track and view all SOS events
- * Features: Event timeline, location trails, downloadable reports
- */
 
-import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,90 +13,65 @@ import {
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Paths, File } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { useState, useEffect } from 'react';
+import firebaseHistoryService, { EmergencyEvent } from '../../services/firebaseHistoryService';
 
-const HISTORY_KEY = 'emergency_history';
-
-export interface EmergencyEvent {
-  id: string;
-  type: 'SOS' | 'LOCATION_SHARE' | 'CHECK_IN' | 'SAFE_ZONE_EXIT';
-  timestamp: number;
-  location: {
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
-    address?: string;
-  } | null;
-  contactsNotified: number;
-  status: 'sent' | 'delivered' | 'failed' | 'queued';
-  networkStatus: 'online' | 'offline';
-  silentMode: boolean;
-  responseTime?: number;
-  notes?: string;
-  trail?: Array<{
-    latitude: number;
-    longitude: number;
-    timestamp: number;
-  }>;
-}
-
-interface EmergencyHistoryScreenProps {
-  userId: string;
-}
-
-export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScreenProps) {
+export default function EmergencyHistoryScreen() {
   const { t } = useTranslation();
-  
   const [events, setEvents] = useState<EmergencyEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<EmergencyEvent | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EmergencyEvent | null>(null);
 
   useEffect(() => {
-    loadHistory();
+    initializeHistory();
   }, []);
 
-  const loadHistory = async () => {
+  const initializeHistory = async () => {
     try {
       setLoading(true);
-      const stored = await AsyncStorage.getItem(HISTORY_KEY);
-      
-      if (stored) {
-        const parsedEvents: EmergencyEvent[] = JSON.parse(stored);
-        // Sort by timestamp (newest first)
-        parsedEvents.sort((a, b) => b.timestamp - a.timestamp);
-        setEvents(parsedEvents);
-      }
+      await firebaseHistoryService.initialize();
+      await loadHistory();
     } catch (error) {
-      console.error('Error loading history:', error);
-      Alert.alert(t('error'), 'Failed to load emergency history');
+      console.error('Error initializing history:', error);
+      Alert.alert(t('error'), 'Failed to initialize emergency history');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveHistory = async (newEvents: EmergencyEvent[]) => {
+  const loadHistory = async () => {
     try {
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(newEvents));
-      setEvents(newEvents);
+      const fetchedEvents = await firebaseHistoryService.getUserEvents();
+      setEvents(fetchedEvents);
     } catch (error) {
-      console.error('Error saving history:', error);
+      console.error('Error loading history:', error);
+      // Try to use cached events
+      const cachedEvents = firebaseHistoryService.getCachedEvents();
+      if (cachedEvents.length > 0) {
+        setEvents(cachedEvents);
+      } else {
+        Alert.alert(t('error'), 'Failed to load emergency history');
+      }
     }
   };
 
-  const addEvent = async (event: Omit<EmergencyEvent, 'id'>) => {
-    const newEvent: EmergencyEvent = {
-      ...event,
-      id: Date.now().toString(),
-    };
-
-    const updatedEvents = [newEvent, ...events];
-    await saveHistory(updatedEvents);
+  const addEvent = async (event: Omit<EmergencyEvent, 'id' | 'userId'>) => {
+    try {
+      await firebaseHistoryService.addEvent(event);
+      await loadHistory();
+    } catch (error) {
+      console.error('Error adding event:', error);
+      Alert.alert(t('error'), 'Failed to add emergency event');
+    }
   };
 
   const deleteEvent = (eventId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     
     Alert.alert(
       'Delete Event',
@@ -112,9 +82,16 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const updatedEvents = events.filter(e => e.id !== eventId);
-            await saveHistory(updatedEvents);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            try {
+              await firebaseHistoryService.deleteEvent(eventId);
+              await loadHistory();
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            } catch (error) {
+              console.error('Error deleting event:', error);
+              Alert.alert(t('error'), 'Failed to delete event');
+            }
           },
         },
       ]
@@ -122,7 +99,9 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
   };
 
   const clearAllHistory = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     
     Alert.alert(
       'Clear All History',
@@ -133,10 +112,17 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
           text: 'Clear All',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.removeItem(HISTORY_KEY);
-            setEvents([]);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Success', 'All history cleared');
+            try {
+              await firebaseHistoryService.clearHistory();
+              setEvents([]);
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+              Alert.alert('Success', 'All history cleared');
+            } catch (error) {
+              console.error('Error clearing history:', error);
+              Alert.alert(t('error'), 'Failed to clear history');
+            }
           },
         },
       ]
@@ -146,7 +132,9 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
   const exportReport = async (event: EmergencyEvent) => {
     try {
       setExporting(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
 
       const report = generateReport(event);
       
@@ -159,22 +147,24 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
       } else {
         // For native, create a file and share
         const fileName = `emergency-report-${event.id}.txt`;
-        const file = new File(Paths.document, fileName);
+        const filePath = `${FileSystem.documentDirectory}${fileName}`;
         
-        await file.write(report);
+        await FileSystem.writeAsStringAsync(filePath, report);
         
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
-          await Sharing.shareAsync(file.uri, {
+          await Sharing.shareAsync(filePath, {
             mimeType: 'text/plain',
             dialogTitle: 'Export Emergency Report',
           });
         } else {
-          Alert.alert('Success', `Report saved to ${file.uri}`);
+          Alert.alert('Success', `Report saved to ${filePath}`);
         }
       }
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } catch (error) {
       console.error('Error exporting report:', error);
       Alert.alert(t('error'), 'Failed to export report');
@@ -367,7 +357,10 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
           renderItem={renderEvent}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
           showsVerticalScrollIndicator={false}
+          style={styles.flatList}
         />
       )}
 
@@ -388,6 +381,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  flatList: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,

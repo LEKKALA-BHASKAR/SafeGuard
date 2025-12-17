@@ -1,7 +1,9 @@
-import * as SMS from 'expo-sms';
 import * as Linking from 'expo-linking';
-import { Platform, Alert } from 'react-native';
+import * as SMS from 'expo-sms';
+import { Alert, Platform } from 'react-native';
 import { LocationData } from './locationService';
+import smsService from './smsService';
+import networkService from './networkService';
 
 export interface EmergencyContact {
   id: string;
@@ -13,28 +15,58 @@ export interface EmergencyContact {
 }
 
 class EmergencyService {
-  // Send SMS to emergency contacts
+  // Send SMS to emergency contacts with fallback logic
   async sendEmergencySMS(
     contacts: EmergencyContact[],
     location: LocationData,
     userName: string
   ): Promise<boolean> {
     try {
-      const isAvailable = await SMS.isAvailableAsync();
-      
-      if (!isAvailable) {
-        console.error('SMS is not available on this device');
-        return false;
+      const isOnline = await networkService.checkConnection();
+      let cloudSuccess = false;
+
+      // 1. Try Cloud SMS (Automatic, Background) if online
+      if (isOnline) {
+        try {
+          const promises = contacts.map(contact => 
+            smsService.sendEmergencyAlert(
+              contact.phoneNumber,
+              userName,
+              location.latitude,
+              location.longitude
+            )
+          );
+          
+          const results = await Promise.all(promises);
+          // Consider success if at least one message sent
+          cloudSuccess = results.some(r => r.success);
+          
+          if (cloudSuccess) {
+            console.log('Emergency alerts sent via Cloud SMS');
+            return true;
+          }
+        } catch (cloudError) {
+          console.warn('Cloud SMS failed, falling back to native:', cloudError);
+        }
       }
 
-      const phoneNumbers = contacts.map(contact => contact.phoneNumber);
-      const locationUrl = `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
-      
-      const message = `🚨 EMERGENCY ALERT 🚨\n\n${userName} needs help!\n\nLocation: ${locationUrl}\n\nLatitude: ${location.latitude}\nLongitude: ${location.longitude}\n\nTime: ${new Date(location.timestamp).toLocaleString()}\n\nThis is an automated emergency message from SafeGuard app.`;
+      // 2. Fallback to Native SMS (Requires user interaction, works offline)
+      // Skip on Web as expo-sms is not supported
+      if (Platform.OS !== 'web') {
+        const isAvailable = await SMS.isAvailableAsync();
+        
+        if (isAvailable) {
+          const phoneNumbers = contacts.map(contact => contact.phoneNumber);
+          const locationUrl = `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
+          
+          const message = `🚨 EMERGENCY ALERT 🚨\n\n${userName} needs help!\n\nLocation: ${locationUrl}\n\nLatitude: ${location.latitude}\nLongitude: ${location.longitude}\n\nTime: ${new Date(location.timestamp).toLocaleString()}\n\nThis is an automated emergency message from SafeGuard app.`;
 
-      const { result } = await SMS.sendSMSAsync(phoneNumbers, message);
-      
-      return result === 'sent';
+          const { result } = await SMS.sendSMSAsync(phoneNumbers, message);
+          return result === 'sent';
+        }
+      }
+
+      return false;
     } catch (error) {
       console.error('Error sending emergency SMS:', error);
       return false;
@@ -102,15 +134,18 @@ class EmergencyService {
     }
   }
 
-  // Send push notifications (placeholder for backend integration)
+  // Send push notifications (requires Firebase Cloud Messaging backend)
   private async sendPushNotifications(
     contacts: EmergencyContact[],
     location: LocationData,
     userName: string
   ): Promise<void> {
-    // This would integrate with your backend to send push notifications
-    // to contacts who have the app installed
-    console.log('Push notifications would be sent here');
+    // Push notifications require Firebase Cloud Messaging (FCM) backend setup:
+    // 1. Enable FCM in Firebase Console
+    // 2. Create Cloud Function to send notifications
+    // 3. Store device tokens in Firestore
+    // 4. Call Cloud Function with contact IDs and alert data
+    console.log('Push notifications require FCM backend configuration');
   }
 
   // Format location message for sharing

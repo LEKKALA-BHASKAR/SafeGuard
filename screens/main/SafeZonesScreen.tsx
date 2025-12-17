@@ -1,47 +1,28 @@
 /**
  * Safe Zones Screen - Manage geofenced safe zones
  * Features: Home/work zones, enter/exit alerts, destination tracking
+ * Storage: Firebase Firestore with offline caching
  */
 
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-  Switch,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const SAFE_ZONES_KEY = 'safe_zones';
-
-export interface SafeZone {
-  id: string;
-  name: string;
-  type: 'home' | 'work' | 'school' | 'hospital' | 'custom';
-  location: {
-    latitude: number;
-    longitude: number;
-    address?: string;
-  };
-  radius: number; // in meters
-  enabled: boolean;
-  alertOnExit: boolean;
-  alertOnEnter: boolean;
-  createdAt: number;
-  lastEntered?: number;
-  lastExited?: number;
-}
+import * as Location from 'expo-location';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import firebaseSafeZonesService, { SafeZone } from '../../services/firebaseSafeZonesService';
 
 interface SafeZonesScreenProps {
   userId: string;
@@ -67,41 +48,41 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
   const [alertOnEnter, setAlertOnEnter] = useState(false);
 
   useEffect(() => {
-    loadZones();
+    initializeZones();
     startGeofenceMonitoring();
 
     return () => {
       stopGeofenceMonitoring();
+      firebaseSafeZonesService.unsubscribeFromZones();
     };
   }, []);
 
-  const loadZones = async () => {
+  const initializeZones = async () => {
     try {
       setLoading(true);
-      const stored = await AsyncStorage.getItem(SAFE_ZONES_KEY);
-      
-      if (stored) {
-        const parsedZones: SafeZone[] = JSON.parse(stored);
-        setZones(parsedZones);
-      }
+      await firebaseSafeZonesService.initialize();
+      await loadZones();
     } catch (error) {
-      console.error('Error loading safe zones:', error);
-      Alert.alert(t('error'), 'Failed to load safe zones');
+      console.error('Error initializing safe zones:', error);
+      Alert.alert(t('error'), 'Failed to initialize safe zones');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveZones = async (newZones: SafeZone[]) => {
+  const loadZones = async () => {
     try {
-      await AsyncStorage.setItem(SAFE_ZONES_KEY, JSON.stringify(newZones));
-      setZones(newZones);
-      
-      // Register geofences with location service
-      await registerGeofences(newZones.filter(z => z.enabled));
+      const fetchedZones = await firebaseSafeZonesService.getUserZones();
+      setZones(fetchedZones);
     } catch (error) {
-      console.error('Error saving safe zones:', error);
-      Alert.alert(t('error'), 'Failed to save safe zones');
+      console.error('Error loading safe zones:', error);
+      // Try to use cached zones
+      const cachedZones = firebaseSafeZonesService.getCachedZones();
+      if (cachedZones.length > 0) {
+        setZones(cachedZones);
+      } else {
+        Alert.alert(t('error'), 'Failed to load safe zones');
+      }
     }
   };
 
@@ -157,7 +138,9 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
   };
 
   const openEditZoneModal = (zone: SafeZone) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     setEditingZone(zone);
     setName(zone.name);
     setType(zone.type);
@@ -172,7 +155,9 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
   const handleUseCurrentLocation = async () => {
     try {
       setGettingLocation(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       
@@ -188,7 +173,9 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
       setLatitude(location.coords.latitude.toString());
       setLongitude(location.coords.longitude.toString());
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } catch (error) {
       console.error('Error getting current location:', error);
       Alert.alert(t('error'), 'Failed to get current location');
@@ -217,45 +204,51 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
       return;
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    handleSaveZoneToFirebase(lat, lng, rad);
+  };
 
-    if (editingZone) {
-      // Update existing zone
-      const updatedZones = zones.map((z) =>
-        z.id === editingZone.id
-          ? {
-              ...z,
-              name,
-              type,
-              location: { latitude: lat, longitude: lng },
-              radius: rad,
-              alertOnExit,
-              alertOnEnter,
-            }
-          : z
-      );
-      saveZones(updatedZones);
-    } else {
-      // Add new zone
-      const newZone: SafeZone = {
-        id: Date.now().toString(),
-        name,
-        type,
-        location: { latitude: lat, longitude: lng },
-        radius: rad,
-        enabled: true,
-        alertOnExit,
-        alertOnEnter,
-        createdAt: Date.now(),
-      };
-      saveZones([...zones, newZone]);
+  const handleSaveZoneToFirebase = async (lat: number, lng: number, rad: number) => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      if (editingZone) {
+        // Update existing zone
+        await firebaseSafeZonesService.updateZone(editingZone.id, {
+          name,
+          type,
+          location: { latitude: lat, longitude: lng },
+          radius: rad,
+          alertOnExit,
+          alertOnEnter,
+        });
+      } else {
+        // Add new zone
+        const newZone: Omit<SafeZone, 'id' | 'userId'> = {
+          name,
+          type,
+          location: { latitude: lat, longitude: lng },
+          radius: rad,
+          enabled: true,
+          alertOnExit,
+          alertOnEnter,
+        };
+        await firebaseSafeZonesService.addZone(newZone);
+      }
+
+      await loadZones();
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Error saving zone:', error);
+      Alert.alert(t('error'), 'Failed to save safe zone');
     }
-
-    setModalVisible(false);
   };
 
   const handleDeleteZone = (zone: SafeZone) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     
     Alert.alert(
       'Delete Safe Zone',
@@ -265,23 +258,35 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            const updatedZones = zones.filter((z) => z.id !== zone.id);
-            saveZones(updatedZones);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onPress: async () => {
+            try {
+              await firebaseSafeZonesService.deleteZone(zone.id);
+              await loadZones();
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            } catch (error) {
+              console.error('Error deleting zone:', error);
+              Alert.alert(t('error'), 'Failed to delete safe zone');
+            }
           },
         },
       ]
     );
   };
 
-  const handleToggleZone = (zone: SafeZone) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    const updatedZones = zones.map((z) =>
-      z.id === zone.id ? { ...z, enabled: !z.enabled } : z
-    );
-    saveZones(updatedZones);
+  const handleToggleZone = async (zone: SafeZone) => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      
+      await firebaseSafeZonesService.toggleZone(zone.id, !zone.enabled);
+      await loadZones();
+    } catch (error) {
+      console.error('Error toggling zone:', error);
+      Alert.alert(t('error'), 'Failed to update safe zone');
+    }
   };
 
   const getZoneIcon = (type: SafeZone['type']) => {
@@ -374,7 +379,10 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
           renderItem={renderZone}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
           showsVerticalScrollIndicator={false}
+          style={styles.flatList}
         />
       )}
 
@@ -520,6 +528,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  flatList: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,

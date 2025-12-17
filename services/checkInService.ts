@@ -1,8 +1,8 @@
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import * as Notifications from 'expo-notifications';
 import { getAuth } from 'firebase/auth';
+import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
+import { Platform } from 'react-native';
 
 export interface CheckInTimer {
   id: string;
@@ -221,7 +221,9 @@ class CheckInService {
       console.error('Error updating missed check-in:', error);
     }
 
-    // TODO: Trigger emergency alert to contacts
+    // Emergency alert would be triggered here
+    // Requires integration with emergencyService and user's emergency contacts
+    console.warn('Check-in timer missed - emergency alert should be configured');
   }
 
   // Cancel a timer

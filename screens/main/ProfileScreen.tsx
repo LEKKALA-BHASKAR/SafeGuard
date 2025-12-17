@@ -3,25 +3,24 @@
  * Handles personal info, medical details, emergency preferences, and permissions
  */
 
-import React, { useState, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Switch,
-  Platform,
-  ActivityIndicator,
-  Image,
+  View
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
 import authService, { UserProfile } from '../../services/authService';
 import otpService from '../../services/otpService';
-import * as Haptics from 'expo-haptics';
 
 interface ProfileScreenProps {
   userId: string;
@@ -187,9 +186,14 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
       });
 
       if (!result.canceled && result.assets[0]) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // TODO: Upload to Firebase Storage and update profile
-        console.log('Image selected:', result.assets[0].uri);
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        
+        // Note: Profile image upload requires Firebase Storage configuration
+        // This would be implemented via Firebase Storage SDK and authService.updateProfile()
+        console.log('Image selected for upload:', result.assets[0].uri);
+        Alert.alert('Feature Coming Soon', 'Profile image upload will be available with Firebase Storage setup');
       }
     } catch (error) {
       console.error('Error picking image:', error);

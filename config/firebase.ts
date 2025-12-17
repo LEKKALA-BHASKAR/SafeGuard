@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 
 // Firebase configuration from GoogleService-Info.plist
 const firebaseConfig = {
@@ -21,4 +22,8 @@ export const auth = getAuth(app);
 // Initialize Firestore
 export const db = getFirestore(app);
 
+// Initialize Cloud Functions
+export const functions = getFunctions(app);
+
 export default app;
+
