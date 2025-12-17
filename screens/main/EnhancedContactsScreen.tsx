@@ -1,0 +1,1015 @@
+/**
+ * Enhanced ContactsScreen - Premium emergency contacts with verification
+ * Features: OTP verification, contact roles, favorites, quick actions
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Alert,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { useTranslation } from 'react-i18next';
+import * as Contacts from 'expo-contacts';
+import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import otpService from '../../services/otpService';
+
+const CONTACTS_KEY = 'emergency_contacts';
+
+export interface EnhancedEmergencyContact {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  relationship: string;
+  role: 'primary' | 'secondary' | 'tertiary';
+  verified: boolean;
+  favorite: boolean;
+  email?: string;
+  notes?: string;
+  addedAt: number;
+  verifiedAt?: number;
+  lastContactedAt?: number;
+}
+
+interface ContactsScreenProps {
+  onContactsChange?: (contacts: EnhancedEmergencyContact[]) => void;
+}
+
+export default function EnhancedContactsScreen({ onContactsChange }: ContactsScreenProps) {
+  const { t } = useTranslation();
+  
+  const [contacts, setContacts] = useState<EnhancedEmergencyContact[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [verifyModalVisible, setVerifyModalVisible] = useState(false);
+  const [editingContact, setEditingContact] = useState<EnhancedEmergencyContact | null>(null);
+  const [verifyingContact, setVerifyingContact] = useState<EnhancedEmergencyContact | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  
+  // Form state
+  const [name, setName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [relationship, setRelationship] = useState('');
+  const [role, setRole] = useState<'primary' | 'secondary' | 'tertiary'>('secondary');
+  const [email, setEmail] = useState('');
+  const [notes, setNotes] = useState('');
+  
+  // OTP state
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  const loadContacts = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(CONTACTS_KEY);
+      if (stored) {
+        const parsedContacts: EnhancedEmergencyContact[] = JSON.parse(stored);
+        setContacts(parsedContacts);
+        onContactsChange?.(parsedContacts);
+      }
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveContacts = async (newContacts: EnhancedEmergencyContact[]) => {
+    try {
+      await AsyncStorage.setItem(CONTACTS_KEY, JSON.stringify(newContacts));
+      setContacts(newContacts);
+      onContactsChange?.(newContacts);
+    } catch (error) {
+      console.error('Error saving contacts:', error);
+      Alert.alert(t('error'), 'Failed to save contacts');
+    }
+  };
+
+  const openAddContactModal = () => {
+    setEditingContact(null);
+    setName('');
+    setPhoneNumber('');
+    setRelationship('');
+    setRole('secondary');
+    setEmail('');
+    setNotes('');
+    setModalVisible(true);
+  };
+
+  const openEditContactModal = (contact: EnhancedEmergencyContact) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditingContact(contact);
+    setName(contact.name);
+    setPhoneNumber(contact.phoneNumber);
+    setRelationship(contact.relationship);
+    setRole(contact.role);
+    setEmail(contact.email || '');
+    setNotes(contact.notes || '');
+    setModalVisible(true);
+  };
+
+  const handleSaveContact = () => {
+    if (!name || !phoneNumber || !relationship) {
+      Alert.alert(t('error'), 'Please fill in all required fields');
+      return;
+    }
+
+    // Validate phone number
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(phoneNumber.replace(/[\s-()]/g, ''))) {
+      Alert.alert(t('error'), 'Please enter a valid phone number with country code (e.g., +1234567890)');
+      return;
+    }
+
+    // Check if primary contact already exists
+    if (role === 'primary' && !editingContact) {
+      const hasPrimary = contacts.some(c => c.role === 'primary');
+      if (hasPrimary) {
+        Alert.alert(
+          'Primary Contact Exists',
+          'You already have a primary contact. Do you want to replace it?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Replace',
+              onPress: () => {
+                // Demote existing primary to secondary
+                const updatedContacts = contacts.map(c =>
+                  c.role === 'primary' ? { ...c, role: 'secondary' as const } : c
+                );
+                saveNewContact(updatedContacts);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    saveNewContact(contacts);
+  };
+
+  const saveNewContact = (existingContacts: EnhancedEmergencyContact[]) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    if (editingContact) {
+      // Update existing contact
+      const updatedContacts = existingContacts.map((c) =>
+        c.id === editingContact.id
+          ? { ...c, name, phoneNumber, relationship, role, email, notes }
+          : c
+      );
+      saveContacts(updatedContacts);
+    } else {
+      // Add new contact
+      const newContact: EnhancedEmergencyContact = {
+        id: Date.now().toString(),
+        name,
+        phoneNumber,
+        relationship,
+        role,
+        verified: false,
+        favorite: false,
+        email,
+        notes,
+        addedAt: Date.now(),
+      };
+      saveContacts([...existingContacts, newContact]);
+    }
+
+    setModalVisible(false);
+  };
+
+  const handleDeleteContact = (contact: EnhancedEmergencyContact) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    Alert.alert(
+      'Delete Contact',
+      `Are you sure you want to delete ${contact.name}?`,
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            const updatedContacts = contacts.filter((c) => c.id !== contact.id);
+            saveContacts(updatedContacts);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleVerifyContact = (contact: EnhancedEmergencyContact) => {
+    setVerifyingContact(contact);
+    setOtpCode('');
+    setOtpSent(false);
+    setVerifyModalVisible(true);
+  };
+
+  const handleSendVerificationOTP = async () => {
+    if (!verifyingContact) return;
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const result = await otpService.sendOTP(verifyingContact.phoneNumber, 'verification');
+      
+      if (result.success) {
+        setOtpSent(true);
+        Alert.alert(t('success'), result.message);
+      } else {
+        Alert.alert(t('error'), result.message);
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      Alert.alert(t('error'), 'Failed to send verification code');
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!verifyingContact || !otpCode) return;
+
+    try {
+      setVerifying(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      const result = await otpService.verifyOTP(verifyingContact.phoneNumber, otpCode);
+      
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Update contact verification status
+        const updatedContacts = contacts.map((c) =>
+          c.id === verifyingContact.id
+            ? { ...c, verified: true, verifiedAt: Date.now() }
+            : c
+        );
+        saveContacts(updatedContacts);
+        
+        setVerifyModalVisible(false);
+        Alert.alert(t('success'), 'Contact verified successfully!');
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(t('error'), result.message);
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      Alert.alert(t('error'), 'Verification failed');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleToggleFavorite = (contact: EnhancedEmergencyContact) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const updatedContacts = contacts.map((c) =>
+      c.id === contact.id ? { ...c, favorite: !c.favorite } : c
+    );
+    saveContacts(updatedContacts);
+  };
+
+  const handleImportFromContacts = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(t('error'), 'Permission to access contacts is required');
+        return;
+      }
+
+      setImporting(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
+      });
+
+      if (data.length > 0) {
+        // Show contact picker
+        Alert.alert(
+          'Import Contact',
+          `Found ${data.length} contacts. This feature will show a picker in the next update.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error importing contacts:', error);
+      Alert.alert(t('error'), 'Failed to import contacts');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const renderContact = ({ item }: { item: EnhancedEmergencyContact }) => (
+    <View style={styles.contactCard}>
+      <TouchableOpacity
+        style={styles.contactContent}
+        onPress={() => openEditContactModal(item)}
+        activeOpacity={0.7}
+      >
+        {/* Avatar */}
+        <View style={[styles.avatar, !item.verified && styles.avatarUnverified]}>
+          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+        </View>
+
+        {/* Contact Info */}
+        <View style={styles.contactInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.contactName}>{item.name}</Text>
+            {item.favorite && <Text style={styles.favoriteIcon}>⭐</Text>}
+          </View>
+          
+          <Text style={styles.contactPhone}>{item.phoneNumber}</Text>
+          <Text style={styles.contactRelationship}>{item.relationship}</Text>
+          
+          {/* Role Badge */}
+          <View style={[styles.roleBadge, styles[`${item.role}Badge`]]}>
+            <Text style={styles.roleBadgeText}>
+              {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Status Icons */}
+        <View style={styles.contactActions}>
+          <TouchableOpacity
+            onPress={() => handleToggleFavorite(item)}
+            style={styles.actionButton}
+          >
+            <Text style={styles.actionIcon}>{item.favorite ? '⭐' : '☆'}</Text>
+          </TouchableOpacity>
+          
+          {item.verified ? (
+            <View style={styles.verifiedBadge}>
+              <Text style={styles.verifiedText}>✓</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => handleVerifyContact(item)}
+              style={styles.verifyButton}
+            >
+              <Text style={styles.verifyButtonText}>Verify</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* Delete Button */}
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDeleteContact(item)}
+      >
+        <Text style={styles.deleteButtonText}>🗑️</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#E63946" />
+        <Text style={styles.loadingText}>Loading contacts...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Emergency Contacts</Text>
+        <Text style={styles.headerSubtitle}>
+          {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} added
+        </Text>
+      </View>
+
+      {/* Contacts List */}
+      {contacts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>👥</Text>
+          <Text style={styles.emptyTitle}>No Emergency Contacts</Text>
+          <Text style={styles.emptyText}>
+            Add trusted contacts who will be notified during emergencies
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={contacts.sort((a, b) => {
+            // Sort: favorites first, then by role, then by name
+            if (a.favorite && !b.favorite) return -1;
+            if (!a.favorite && b.favorite) return 1;
+            
+            const roleOrder = { primary: 0, secondary: 1, tertiary: 2 };
+            if (roleOrder[a.role] !== roleOrder[b.role]) {
+              return roleOrder[a.role] - roleOrder[b.role];
+            }
+            
+            return a.name.localeCompare(b.name);
+          })}
+          renderItem={renderContact}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.importBtn]}
+          onPress={handleImportFromContacts}
+          disabled={importing}
+        >
+          {importing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.actionBtnIcon}>📱</Text>
+              <Text style={styles.actionBtnText}>Import</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.addBtn]}
+          onPress={openAddContactModal}
+        >
+          <Text style={styles.actionBtnIcon}>+</Text>
+          <Text style={styles.actionBtnText}>Add Contact</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Add/Edit Contact Modal */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>
+                {editingContact ? 'Edit Contact' : 'Add Contact'}
+              </Text>
+
+              <Text style={styles.label}>Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Full name"
+                placeholderTextColor="#999"
+              />
+
+              <Text style={styles.label}>Phone Number *</Text>
+              <TextInput
+                style={styles.input}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder="+1234567890"
+                keyboardType="phone-pad"
+                placeholderTextColor="#999"
+              />
+
+              <Text style={styles.label}>Relationship *</Text>
+              <TextInput
+                style={styles.input}
+                value={relationship}
+                onChangeText={setRelationship}
+                placeholder="e.g., Mother, Friend, Colleague"
+                placeholderTextColor="#999"
+              />
+
+              <Text style={styles.label}>Role *</Text>
+              <View style={styles.roleSelector}>
+                {(['primary', 'secondary', 'tertiary'] as const).map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    style={[styles.roleOption, role === r && styles.roleOptionSelected]}
+                    onPress={() => setRole(r)}
+                  >
+                    <Text style={[styles.roleOptionText, role === r && styles.roleOptionTextSelected]}>
+                      {r.charAt(0).toUpperCase() + r.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Email (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="email@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#999"
+              />
+
+              <Text style={styles.label}>Notes (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Additional information..."
+                multiline
+                numberOfLines={3}
+                placeholderTextColor="#999"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.cancelBtn]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.saveBtn]}
+                  onPress={handleSaveContact}
+                >
+                  <Text style={styles.saveBtnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Verify Contact Modal */}
+      <Modal
+        visible={verifyModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setVerifyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.verifyModalContent}>
+            <Text style={styles.modalTitle}>Verify Contact</Text>
+            <Text style={styles.verifySubtitle}>
+              {verifyingContact?.name}
+            </Text>
+            <Text style={styles.verifyPhone}>
+              {verifyingContact?.phoneNumber}
+            </Text>
+
+            {!otpSent ? (
+              <>
+                <Text style={styles.verifyDescription}>
+                  We'll send a verification code to this number
+                </Text>
+                <TouchableOpacity
+                  style={styles.sendOtpBtn}
+                  onPress={handleSendVerificationOTP}
+                >
+                  <Text style={styles.sendOtpBtnText}>Send Verification Code</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.otpLabel}>Enter 6-digit code</Text>
+                <TextInput
+                  style={styles.otpInput}
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  placeholder="000000"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  placeholderTextColor="#999"
+                />
+                
+                <TouchableOpacity
+                  style={styles.verifyOtpBtn}
+                  onPress={handleVerifyOTP}
+                  disabled={verifying}
+                >
+                  {verifying ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.verifyOtpBtnText}>Verify Code</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={handleSendVerificationOTP}>
+                  <Text style={styles.resendText}>Resend Code</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity
+              style={styles.closeModalBtn}
+              onPress={() => setVerifyModalVisible(false)}
+            >
+              <Text style={styles.closeModalText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  header: {
+    backgroundColor: '#E63946',
+    padding: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  contactCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  contactContent: {
+    flexDirection: 'row',
+    padding: 16,
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E63946',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  avatarUnverified: {
+    backgroundColor: '#999',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  contactName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  favoriteIcon: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  contactRelationship: {
+    fontSize: 14,
+    color: '#999',
+    marginBottom: 8,
+  },
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  primaryBadge: {
+    backgroundColor: '#FFE0E0',
+  },
+  secondaryBadge: {
+    backgroundColor: '#E0F0FF',
+  },
+  tertiaryBadge: {
+    backgroundColor: '#F0F0F0',
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  contactActions: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+  },
+  actionIcon: {
+    fontSize: 20,
+  },
+  verifiedBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verifiedText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  verifyButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 8,
+  },
+  deleteButtonText: {
+    fontSize: 20,
+  },
+  actionButtons: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 8,
+  },
+  importBtn: {
+    backgroundColor: '#2196F3',
+  },
+  addBtn: {
+    backgroundColor: '#E63946',
+  },
+  actionBtnIcon: {
+    fontSize: 20,
+    color: '#fff',
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '90%',
+  },
+  verifyModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 24,
+  },
+  verifySubtitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  verifyPhone: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
+  verifyDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  roleSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  roleOption: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+  },
+  roleOptionSelected: {
+    borderColor: '#E63946',
+    backgroundColor: '#FFE0E0',
+  },
+  roleOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  roleOptionTextSelected: {
+    color: '#E63946',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  modalBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#F0F0F0',
+  },
+  cancelBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  saveBtn: {
+    backgroundColor: '#E63946',
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  sendOtpBtn: {
+    backgroundColor: '#FF9800',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sendOtpBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  otpLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  otpInput: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 24,
+    textAlign: 'center',
+    letterSpacing: 8,
+    borderWidth: 2,
+    borderColor: '#FF9800',
+    marginBottom: 16,
+  },
+  verifyOtpBtn: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  verifyOtpBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  resendText: {
+    fontSize: 14,
+    color: '#FF9800',
+    textAlign: 'center',
+    fontWeight: '500',
+    marginBottom: 16,
+  },
+  closeModalBtn: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  closeModalText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+});
