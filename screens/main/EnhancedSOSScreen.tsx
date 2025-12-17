@@ -16,7 +16,6 @@ import {
   Platform,
   Switch,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Accelerometer } from 'expo-sensors';

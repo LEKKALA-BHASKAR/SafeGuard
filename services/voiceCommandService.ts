@@ -199,7 +199,8 @@ class VoiceCommandService {
   private handleSOSCommand(): void {
     if (this.config.confirmationRequired) {
       this.speak('SOS command detected. Say "confirm" to send emergency alert, or "cancel" to abort.');
-      // In a real implementation, would wait for confirmation
+      // Start listening for confirmation
+      // The confirmation will be handled in processRecognizedText
     } else {
       this.speak('Sending emergency alert now.');
       this.triggerSOS();
@@ -305,21 +306,23 @@ class VoiceCommandService {
 
   /**
    * Web Speech API implementation
+   * Note: Uses any types for web-specific APIs that may not be available in all environments
    */
   private webRecognition: any = null;
 
   private startWebSpeechRecognition(): void {
     if (typeof window === 'undefined') return;
 
-    const SpeechRecognition = (window as any).SpeechRecognition || 
-                               (window as any).webkitSpeechRecognition;
+    // Access Web Speech API - may not be available in all browsers
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || 
+                                  (window as any).webkitSpeechRecognition;
     
-    if (!SpeechRecognition) {
+    if (!SpeechRecognitionAPI) {
       console.log('Web Speech API not supported');
       return;
     }
 
-    this.webRecognition = new SpeechRecognition();
+    this.webRecognition = new SpeechRecognitionAPI();
     this.webRecognition.continuous = true;
     this.webRecognition.interimResults = false;
     this.webRecognition.lang = this.config.language;
@@ -340,7 +343,7 @@ class VoiceCommandService {
 
     this.webRecognition.onend = () => {
       // Restart if still supposed to be listening
-      if (this.isListening) {
+      if (this.isListening && this.webRecognition) {
         this.webRecognition.start();
       }
     };

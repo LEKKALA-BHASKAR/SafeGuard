@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet, Animated, Dimensions, Platform, Alert } from 'react-native';
 
 interface WebMapProps {
   location: {
@@ -72,9 +72,11 @@ const WebMap: React.FC<WebMapProps> = ({
   const shareLocation = () => {
     if (location) {
       const message = `📍 My current location: https://maps.google.com/?q=${location.latitude},${location.longitude}`;
-      if (navigator.clipboard) {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && navigator.clipboard) {
         navigator.clipboard.writeText(message);
-        alert('Location copied to clipboard!');
+        Alert.alert('Copied', 'Location copied to clipboard!');
+      } else {
+        Alert.alert('Share Location', message);
       }
     }
   };
@@ -92,18 +94,25 @@ const WebMap: React.FC<WebMapProps> = ({
       <View style={styles.mapContainer}>
         {location ? (
           <View style={styles.mapWrapper}>
-            {/* OpenStreetMap iframe */}
-            <iframe
-              src={getMapUrl()}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                borderRadius: 12,
-              }}
-              onLoad={() => setMapLoaded(true)}
-              title="Location Map"
-            />
+            {/* OpenStreetMap iframe - Web only */}
+            {Platform.OS === 'web' ? (
+              <iframe
+                src={getMapUrl()}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  borderRadius: 12,
+                }}
+                onLoad={() => setMapLoaded(true)}
+                title="Location Map"
+              />
+            ) : (
+              <View style={styles.nativeMapPlaceholder}>
+                <Text style={styles.nativeMapText}>📍</Text>
+                <Text style={styles.nativeMapLabel}>Use native map on mobile</Text>
+              </View>
+            )}
             
             {/* Loading overlay */}
             {!mapLoaded && (
@@ -330,6 +339,20 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  nativeMapPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  nativeMapText: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  nativeMapLabel: {
+    fontSize: 14,
+    color: '#666',
   },
   loadingDots: {
     flexDirection: 'row',
