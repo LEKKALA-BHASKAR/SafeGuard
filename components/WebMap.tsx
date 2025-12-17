@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet, Animated, Dimensions, Platform, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet, Animated, Platform, Alert } from 'react-native';
 
 interface WebMapProps {
   location: {
@@ -13,16 +13,14 @@ interface WebMapProps {
     accuracy?: number;
   } | null;
   isTracking: boolean;
-  safeZones?: Array<{
+  safeZones?: {
     latitude: number;
     longitude: number;
     radius: number;
     name: string;
-  }>;
+  }[];
   showAccuracyCircle?: boolean;
 }
-
-const { width } = Dimensions.get('window');
 
 const WebMap: React.FC<WebMapProps> = ({ 
   location, 
@@ -53,7 +51,7 @@ const WebMap: React.FC<WebMapProps> = ({
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isTracking, location]);
+  }, [isTracking, location, pulseAnim]);
 
   const openInGoogleMaps = () => {
     if (location) {
@@ -84,7 +82,6 @@ const WebMap: React.FC<WebMapProps> = ({
   // Generate OpenStreetMap iframe URL
   const getMapUrl = () => {
     if (!location) return '';
-    const zoom = 15;
     return `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.01},${location.latitude - 0.01},${location.longitude + 0.01},${location.latitude + 0.01}&layer=mapnik&marker=${location.latitude},${location.longitude}`;
   };
 

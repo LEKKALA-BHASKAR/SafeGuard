@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import { Camera } from 'expo-camera';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
@@ -168,13 +168,11 @@ class PanicRecordingService {
         throw new Error('User not authenticated');
       }
 
-      // Read file
-      const fileData = await FileSystem.readAsStringAsync(session.fileUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Convert to blob
-      const blob = await fetch(`data:audio/m4a;base64,${fileData}`).then(r => r.blob());
+      // Read file as blob (File class implements Blob interface)
+      // session.fileUri is a file:// URI from Audio.Recording.getURI()
+      // The File constructor accepts URIs as strings
+      const file = new File(session.fileUri);
+      const blob = file.slice(0, file.size, 'audio/m4a');
 
       // Upload to Firebase Storage
       const storage = getStorage();
@@ -213,7 +211,10 @@ class PanicRecordingService {
     }
 
     try {
-      await FileSystem.deleteAsync(session.fileUri, { idempotent: true });
+      // session.fileUri is a file:// URI from Audio.Recording.getURI()
+      // The File constructor accepts URIs as strings
+      const file = new File(session.fileUri);
+      await file.delete();
       this.activeSessions.delete(sessionId);
       return true;
     } catch (error) {

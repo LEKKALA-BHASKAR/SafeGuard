@@ -18,7 +18,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import * as FileSystem from 'expo-file-system';
+import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const HISTORY_KEY = 'emergency_history';
@@ -159,18 +159,18 @@ export default function EmergencyHistoryScreen({ userId }: EmergencyHistoryScree
       } else {
         // For native, create a file and share
         const fileName = `emergency-report-${event.id}.txt`;
-        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        const file = new File(Paths.document, fileName);
         
-        await FileSystem.writeAsStringAsync(fileUri, report);
+        await file.write(report);
         
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
-          await Sharing.shareAsync(fileUri, {
+          await Sharing.shareAsync(file.uri, {
             mimeType: 'text/plain',
             dialogTitle: 'Export Emergency Report',
           });
         } else {
-          Alert.alert('Success', `Report saved to ${fileUri}`);
+          Alert.alert('Success', `Report saved to ${file.uri}`);
         }
       }
 
