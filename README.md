@@ -2,8 +2,6 @@
 
 <div align="center">
 
-![SafeGuard Logo](assets/icon.png)
-
 **A premium, cross-platform, real-time safety & emergency assistance system**
 
 [![React Native](https://img.shields.io/badge/React%20Native-0.81.5-blue.svg)](https://reactnative.dev/)
@@ -196,8 +194,13 @@ SafeGuard/
    - Update `config/firebase.ts` with your credentials
 
 4. **Configure environment variables:**
-   - Copy `.env.example` to `.env`
-   - Update with your API keys
+   - The project uses a `.env` file for environment variables
+   - Key variables needed:
+     - `FIREBASE_API_KEY` - Firebase API key
+     - `FIREBASE_AUTH_DOMAIN` - Firebase auth domain
+     - `FIREBASE_PROJECT_ID` - Firebase project ID
+     - `GOOGLE_MAPS_API_KEY` - Google Maps API key (for web)
+   - See `.env` file for the complete list of configurable options
 
 5. **Start the development server:**
    ```bash
