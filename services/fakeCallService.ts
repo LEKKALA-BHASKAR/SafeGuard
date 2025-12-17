@@ -243,16 +243,22 @@ class FakeCallService {
     return calls.length > 0 ? calls[0] : null;
   }
 
-  // Get custom callers (for now returns presets, can be extended)
+  // Get custom callers (currently returns presets - custom caller persistence not yet implemented)
+  // TODO: Implement AsyncStorage persistence for user-added custom callers
   async getCustomCallers(): Promise<Array<{ name: string; number: string }>> {
+    // For now, return preset callers
+    // In future: Load from AsyncStorage and merge with presets
     return this.getPresetCallers();
   }
 
-  // Save custom caller (placeholder for future enhancement)
+  // Save custom caller (temporary - not persisted)
+  // TODO: Implement AsyncStorage persistence to save custom callers permanently
   async saveCustomCaller(name: string, number: string): Promise<void> {
-    // This would save to AsyncStorage in a real implementation
+    // Warning: This is temporary storage only - callers are lost on app restart
+    // In a production implementation, save to AsyncStorage
     this.presetCallers.push({ name, number });
-    console.log(`Custom caller saved: ${name} - ${number}`);
+    console.log(`Custom caller saved (temporary): ${name} - ${number}`);
+    console.warn('Custom callers are not persisted and will be lost on app restart');
   }
 
   // Trigger quick fake call (alias for quickFakeCall)

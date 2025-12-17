@@ -147,9 +147,10 @@ class EmergencyService {
   async sendEmergencyAlert(
     contacts: EmergencyContact[],
     location: LocationData,
-    userName: string
+    userName: string,
+    shouldCall: boolean = false
   ): Promise<void> {
-    return this.triggerEmergencyAlert(contacts, location, userName, true);
+    return this.triggerEmergencyAlert(contacts, location, userName, shouldCall);
   }
 }
 
