@@ -1,6 +1,6 @@
 /**
  * Enhanced SOS Screen - Premium emergency alert system
- * Features: Shake-to-SOS, Silent mode, Multiple triggers, Real-time status
+ * Features: Shake-to-SOS, Silent mode, Multiple triggers, Voice commands, Real-time status
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -20,10 +20,14 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import locationService, { LocationData } from '../../services/locationService';
 import emergencyService from '../../services/emergencyService';
 import networkService from '../../services/networkService';
+import voiceCommandService from '../../services/voiceCommandService';
 import { EnhancedEmergencyContact } from './EnhancedContactsScreen';
+
+const EMERGENCY_HISTORY_KEY = 'emergency_history';
 
 interface EnhancedSOSScreenProps {
   userContacts: EnhancedEmergencyContact[];
@@ -51,6 +55,7 @@ export default function EnhancedSOSScreen({
   const [silentMode, setSilentMode] = useState(false);
   const [shakeEnabled, setShakeEnabled] = useState(false);
   const [autoCall, setAutoCall] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   
   // Network status
@@ -61,22 +66,60 @@ export default function EnhancedSOSScreen({
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
   
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shakeSubscription = useRef<any>(null);
 
   useEffect(() => {
+    // Initialize services
+    initializeServices();
+    
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  const initializeServices = async () => {
     // Initialize network monitoring
-    networkService.initialize();
+    await networkService.initialize();
     const unsubscribe = networkService.addListener((status) => {
       setIsOnline(status.isConnected);
     });
 
+    // Initialize voice commands
+    await voiceCommandService.initialize();
+    voiceCommandService.setSOSTriggerCallback(() => {
+      triggerSOS();
+    });
+    voiceCommandService.setCancelTriggerCallback(() => {
+      deactivateSOS();
+    });
+
+    // Start glow animation
+    startGlowAnimation();
+
     return () => {
       unsubscribe();
-      cleanup();
     };
-  }, []);
+  };
+
+  const startGlowAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  };
 
   useEffect(() => {
     // Pulse animation when SOS is activated
@@ -110,6 +153,18 @@ export default function EnhancedSOSScreen({
 
     return () => stopShakeDetection();
   }, [shakeEnabled, sosActivated]);
+
+  useEffect(() => {
+    // Voice command handling
+    if (voiceEnabled && !sosActivated) {
+      voiceCommandService.enable();
+      voiceCommandService.startListening();
+    } else {
+      voiceCommandService.stopListening();
+    }
+
+    return () => voiceCommandService.stopListening();
+  }, [voiceEnabled, sosActivated]);
 
   const startShakeDetection = () => {
     Accelerometer.setUpdateInterval(100);
@@ -343,6 +398,7 @@ export default function EnhancedSOSScreen({
   const logSOSEvent = async (location: LocationData | null) => {
     try {
       const event = {
+        id: Date.now().toString(),
         userId,
         type: 'SOS',
         timestamp: Date.now(),
@@ -354,11 +410,24 @@ export default function EnhancedSOSScreen({
         contactsNotified: userContacts.length,
         silentMode,
         networkStatus: isOnline ? 'online' : 'offline',
+        status: isOnline ? 'sent' : 'queued',
       };
 
       // Save to AsyncStorage for local history
-      // TODO: Also sync to Firebase for cloud backup
+      const existingHistory = await AsyncStorage.getItem(EMERGENCY_HISTORY_KEY);
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+      history.unshift(event);
+      
+      // Keep only last 100 events
+      const trimmedHistory = history.slice(0, 100);
+      await AsyncStorage.setItem(EMERGENCY_HISTORY_KEY, JSON.stringify(trimmedHistory));
+      
       console.log('SOS Event Logged:', event);
+
+      // Voice feedback if enabled
+      if (!silentMode) {
+        voiceCommandService.announceEmergencyAlert();
+      }
     } catch (error) {
       console.error('Error logging SOS event:', error);
     }
@@ -367,6 +436,12 @@ export default function EnhancedSOSScreen({
   const deactivateSOS = () => {
     setSosActivated(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Voice feedback
+    if (!silentMode) {
+      voiceCommandService.announceSOSDeactivation();
+    }
+    
     Alert.alert('SOS Deactivated', 'Emergency mode turned off.');
   };
 
@@ -519,6 +594,29 @@ export default function EnhancedSOSScreen({
             thumbColor="#fff"
           />
         </View>
+
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>🎤 Voice Commands</Text>
+            <Text style={styles.settingDescription}>
+              Say "Help" or "Emergency" to trigger SOS
+            </Text>
+          </View>
+          <Switch
+            value={voiceEnabled}
+            onValueChange={setVoiceEnabled}
+            trackColor={{ false: '#ccc', true: '#E63946' }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        {voiceEnabled && (
+          <View style={styles.voiceInfoBanner}>
+            <Text style={styles.voiceInfoText}>
+              🎙️ Voice listening active - Say "help", "emergency", or "SOS"
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Contacts Summary */}
@@ -696,6 +794,18 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 13,
     color: '#666',
+  },
+  voiceInfoBanner: {
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  voiceInfoText: {
+    fontSize: 13,
+    color: '#1976D2',
+    textAlign: 'center',
+    fontWeight: '500',
   },
   contactsSummary: {
     backgroundColor: '#fff',
