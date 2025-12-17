@@ -178,7 +178,7 @@ SafeGuard/
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/LEKKALA-BHASKAR/SafeGuard.git
+   git clone <repository-url>
    cd SafeGuard
    ```
 
@@ -194,13 +194,13 @@ SafeGuard/
    - Update `config/firebase.ts` with your credentials
 
 4. **Configure environment variables:**
-   - The project uses a `.env` file for environment variables
+   - Create a `.env` file in the project root (or update the existing one)
    - Key variables needed:
      - `FIREBASE_API_KEY` - Firebase API key
      - `FIREBASE_AUTH_DOMAIN` - Firebase auth domain
      - `FIREBASE_PROJECT_ID` - Firebase project ID
      - `GOOGLE_MAPS_API_KEY` - Google Maps API key (for web)
-   - See `.env` file for the complete list of configurable options
+   - See existing `.env` file for the complete list of configurable options
 
 5. **Start the development server:**
    ```bash
