@@ -3,25 +3,25 @@
  * Features: Shake-to-SOS, Silent mode, Multiple triggers, Real-time status
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Alert,
-  Vibration,
-  Dimensions,
-  Platform,
-  Switch,
-  ActivityIndicator,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
-import locationService, { LocationData } from '../../services/locationService';
+import { Accelerometer } from 'expo-sensors';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    Platform,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    Vibration,
+    View,
+} from 'react-native';
 import emergencyService from '../../services/emergencyService';
+import locationService, { LocationData } from '../../services/locationService';
 import networkService from '../../services/networkService';
 import { EnhancedEmergencyContact } from './EnhancedContactsScreen';
 
@@ -34,6 +34,11 @@ interface EnhancedSOSScreenProps {
 const { width } = Dimensions.get('window');
 const LONG_PRESS_DURATION = 3000;
 const SHAKE_THRESHOLD = 2.5;
+
+// SOS Button sizing - smaller on web
+const SOS_BUTTON_SIZE = Platform.OS === 'web' 
+  ? Math.min(width * 0.4, 280)  // 40% of width, max 280px on web
+  : width * 0.7;                 // 70% of width on mobile
 
 export default function EnhancedSOSScreen({
   userContacts,
@@ -593,7 +598,7 @@ const styles = StyleSheet.create({
     left: -12,
     right: -12,
     bottom: -12,
-    borderRadius: (width * 0.7 + 24) / 2,
+    borderRadius: (SOS_BUTTON_SIZE + 24) / 2,
     borderWidth: 8,
     borderColor: 'rgba(230, 57, 70, 0.2)',
     overflow: 'hidden',
@@ -622,9 +627,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   sosButton: {
-    width: width * 0.7,
-    height: width * 0.7,
-    borderRadius: (width * 0.7) / 2,
+    width: SOS_BUTTON_SIZE,
+    height: SOS_BUTTON_SIZE,
+    borderRadius: SOS_BUTTON_SIZE / 2,
     backgroundColor: '#E63946',
     justifyContent: 'center',
     alignItems: 'center',
@@ -641,13 +646,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sosText: {
-    fontSize: 72,
+    fontSize: Platform.OS === 'web' ? 48 : 72,
     fontWeight: 'bold',
     color: '#fff',
     letterSpacing: 4,
   },
   sosSubtext: {
-    fontSize: 20,
+    fontSize: Platform.OS === 'web' ? 14 : 20,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '600',
     marginTop: 8,
