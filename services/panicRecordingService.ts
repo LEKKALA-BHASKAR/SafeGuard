@@ -168,13 +168,9 @@ class PanicRecordingService {
         throw new Error('User not authenticated');
       }
 
-      // Read file
+      // Read file as blob (File class implements Blob interface)
       const file = new File(session.fileUri);
-      const fileData = await file.text();
-      const base64Data = Buffer.from(fileData).toString('base64');
-
-      // Convert to blob
-      const blob = await fetch(`data:audio/m4a;base64,${base64Data}`).then(r => r.blob());
+      const blob = file.slice(0, file.size, 'audio/m4a');
 
       // Upload to Firebase Storage
       const storage = getStorage();
