@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import { Camera } from 'expo-camera';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
@@ -169,12 +169,12 @@ class PanicRecordingService {
       }
 
       // Read file
-      const fileData = await FileSystem.readAsStringAsync(session.fileUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const file = new File(session.fileUri);
+      const fileData = await file.text();
+      const base64Data = Buffer.from(fileData).toString('base64');
 
       // Convert to blob
-      const blob = await fetch(`data:audio/m4a;base64,${fileData}`).then(r => r.blob());
+      const blob = await fetch(`data:audio/m4a;base64,${base64Data}`).then(r => r.blob());
 
       // Upload to Firebase Storage
       const storage = getStorage();
@@ -213,7 +213,8 @@ class PanicRecordingService {
     }
 
     try {
-      await FileSystem.deleteAsync(session.fileUri, { idempotent: true });
+      const file = new File(session.fileUri);
+      await file.delete();
       this.activeSessions.delete(sessionId);
       return true;
     } catch (error) {
