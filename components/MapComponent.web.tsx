@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 interface MapComponentProps {
   location: {

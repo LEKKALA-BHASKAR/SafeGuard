@@ -2,8 +2,8 @@ import * as Linking from 'expo-linking';
 import * as SMS from 'expo-sms';
 import { Alert, Platform } from 'react-native';
 import { LocationData } from './locationService';
-import smsService from './smsService';
 import networkService from './networkService';
+import smsService from './smsService';
 
 export interface EmergencyContact {
   id: string;

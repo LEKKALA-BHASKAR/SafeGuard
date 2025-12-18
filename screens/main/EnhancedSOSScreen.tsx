@@ -9,22 +9,23 @@ import { Accelerometer } from 'expo-sensors';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Vibration,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    Vibration,
+    View
 } from 'react-native';
 import emergencyService from '../../services/emergencyService';
+import firebaseHistoryService from '../../services/firebaseHistoryService';
 import locationService, { LocationData } from '../../services/locationService';
 import networkService from '../../services/networkService';
 import { EnhancedEmergencyContact } from './EnhancedContactsScreen';
@@ -466,18 +467,31 @@ export default function EnhancedSOSScreen({
     }
   };
 
-import firebaseHistoryService from '../../services/firebaseHistoryService';
-
-// ... existing imports ...
-
-// ... inside EnhancedSOSScreen ...
-
   const logSOSEvent = async (location: LocationData | null, message?: string, voiceUri?: string | null) => {
     try {
       const event = {
         type: 'SOS' as const,
         timestamp: Date.now(),
         message: message || 'Emergency!',
+        hasVoiceNote: !!voiceUri,
+        voiceRecordingUri: voiceUri,
+        location: location ? {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy || 0,
+        } : null,
+        contactsNotified: userContacts.length,
+        status: 'sent' as const,
+        silentMode,
+        networkStatus: isOnline ? 'online' as const : 'offline' as const,
+      };
+
+      await firebaseHistoryService.addEvent(event);
+      console.log('SOS Event logged to Firebase');
+    } catch (error) {
+      console.error('Error logging SOS event:', error);
+    }
+  };
         hasVoiceNote: !!voiceUri,
         voiceRecordingUri: voiceUri,
         location: location ? {
