@@ -6,22 +6,24 @@
 
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from 'react-native';
+import { getTheme } from '../../constants/theme';
 import firebaseSafeZonesService, { SafeZone } from '../../services/firebaseSafeZonesService';
 
 interface SafeZonesScreenProps {
@@ -31,6 +33,9 @@ interface SafeZonesScreenProps {
 
 export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesScreenProps) {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
   
   const [zones, setZones] = useState<SafeZone[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -338,8 +343,8 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
         <Switch
           value={item.enabled}
           onValueChange={() => handleToggleZone(item)}
-          trackColor={{ false: '#ccc', true: '#4CAF50' }}
-          thumbColor="#fff"
+          trackColor={{ false: theme.colors.border, true: theme.colors.success }}
+          thumbColor={theme.colors.textInverse}
         />
       </TouchableOpacity>
     </View>
@@ -348,7 +353,7 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#E63946" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading safe zones...</Text>
       </View>
     );
@@ -415,7 +420,7 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g., Home, Office"
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textTertiary}
               />
 
               <Text style={styles.label}>Type *</Text>
@@ -442,7 +447,7 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                   onChangeText={setLatitude}
                   placeholder="Latitude"
                   keyboardType="numeric"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.textTertiary}
                 />
                 <TextInput
                   style={[styles.input, styles.locationInput]}
@@ -450,7 +455,7 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                   onChangeText={setLongitude}
                   placeholder="Longitude"
                   keyboardType="numeric"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.textTertiary}
                 />
               </View>
               
@@ -460,7 +465,7 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                 disabled={gettingLocation}
               >
                 {gettingLocation ? (
-                  <ActivityIndicator size="small" color="#2196F3" />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
                   <Text style={styles.currentLocationButtonText}>
                     📍 Use Current Location
@@ -475,7 +480,7 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                 onChangeText={setRadius}
                 placeholder="e.g., 100"
                 keyboardType="number-pad"
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textTertiary}
               />
               <Text style={styles.helperText}>
                 Recommended: 50-200 meters
@@ -486,8 +491,8 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                 <Switch
                   value={alertOnExit}
                   onValueChange={setAlertOnExit}
-                  trackColor={{ false: '#ccc', true: '#E63946' }}
-                  thumbColor="#fff"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.error }}
+                  thumbColor={theme.colors.textInverse}
                 />
               </View>
 
@@ -496,8 +501,8 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
                 <Switch
                   value={alertOnEnter}
                   onValueChange={setAlertOnEnter}
-                  trackColor={{ false: '#ccc', true: '#4CAF50' }}
-                  thumbColor="#fff"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.success }}
+                  thumbColor={theme.colors.textInverse}
                 />
               </View>
 
@@ -524,10 +529,10 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   flatList: {
     flex: 1,
@@ -536,27 +541,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.success,
     padding: 24,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: theme.colors.textInverse,
+    opacity: 0.9,
   },
   emptyContainer: {
     flex: 1,
@@ -571,12 +577,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -585,14 +591,10 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   zoneCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   zoneCardDisabled: {
     opacity: 0.5,
@@ -606,7 +608,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: theme.colors.success + '20', // 20% opacity
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -620,17 +622,17 @@ const styles = StyleSheet.create({
   zoneName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   zoneType: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   zoneRadius: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginBottom: 8,
   },
   alertBadges: {
@@ -643,28 +645,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   exitBadge: {
-    backgroundColor: '#FFE0E0',
+    backgroundColor: theme.colors.error + '20',
   },
   enterBadge: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: theme.colors.success + '20',
   },
   alertBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   addButton: {
     position: 'absolute',
     bottom: 16,
     left: 16,
     right: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.success,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 18,
     borderRadius: 16,
-    shadowColor: '#4CAF50',
+    shadowColor: theme.colors.success,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -673,11 +675,11 @@ const styles = StyleSheet.create({
   },
   addButtonIcon: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontWeight: 'bold',
   },
   addButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -687,7 +689,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -696,24 +698,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
     marginTop: 12,
   },
   input: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
   },
   typeSelector: {
     flexDirection: 'row',
@@ -727,12 +729,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
     gap: 8,
   },
   typeOptionSelected: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#E8F5E9',
+    borderColor: theme.colors.success,
+    backgroundColor: theme.colors.success + '20',
   },
   typeIcon: {
     fontSize: 20,
@@ -740,11 +742,11 @@ const styles = StyleSheet.create({
   typeOptionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
     textTransform: 'capitalize',
   },
   typeOptionTextSelected: {
-    color: '#4CAF50',
+    color: theme.colors.semantic.success,
   },
   locationRow: {
     flexDirection: 'row',
@@ -754,20 +756,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   currentLocationButton: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.colors.primary + '20',
     padding: 12,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
   },
   currentLocationButtonText: {
-    color: '#2196F3',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   helperText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   switchRow: {
@@ -776,12 +778,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: theme.colors.border,
     marginTop: 12,
   },
   switchLabel: {
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
     flex: 1,
   },
   modalButtons: {
@@ -796,19 +798,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtn: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: theme.colors.background,
   },
   cancelBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   saveBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.success,
   },
   saveBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.textInverse,
   },
 });

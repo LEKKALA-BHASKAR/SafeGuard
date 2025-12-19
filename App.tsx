@@ -8,8 +8,10 @@ import {
   Platform,
   StatusBar,
   StyleSheet,
-  View
+  View,
+  useColorScheme
 } from 'react-native';
+import { getTheme } from './constants/theme';
 import { EnhancedEmergencyContact } from './screens/main/EnhancedContactsScreen';
 import authService from './services/authService';
 import i18n, { loadSavedLanguage } from './services/i18n';
@@ -29,12 +31,14 @@ import SafeZonesScreen from './screens/main/SafeZonesScreen';
 import SettingsScreen from './screens/main/SettingsScreen';
 
 // Premium Screens
-import LocationSharingScreen from './screens/premium/LocationSharingScreen';
+import FindMyFamilyScreen from './screens/main/FindMyFamilyScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [userName, setUserName] = useState('User');
@@ -96,8 +100,11 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <I18nextProvider i18n={i18n}>
-        <View style={styles.container}>
-          <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <StatusBar 
+            barStyle={colorScheme === 'dark' ? "light-content" : "dark-content"} 
+            backgroundColor={theme.colors.background} 
+          />
           {showRegister ? (
             <RegisterScreen
               onRegisterSuccess={handleRegisterSuccess}
@@ -116,19 +123,21 @@ export default function App() {
 
   return (
     <I18nextProvider i18n={i18n}>
-      <NavigationContainer>
-        <StatusBar barStyle="light-content" backgroundColor="#E63946" />
+      <NavigationContainer theme={theme}>
+        <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
         <Tab.Navigator
           screenOptions={{
             headerShown: false,
-            tabBarActiveTintColor: '#E63946',
-            tabBarInactiveTintColor: '#999',
+            tabBarActiveTintColor: theme.colors.primary,
+            tabBarInactiveTintColor: theme.colors.textSecondary,
             tabBarStyle: {
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.border,
               height: Platform.OS === 'ios' ? 90 : 70,
               paddingBottom: Platform.OS === 'ios' ? 30 : 10,
               paddingTop: 10,
               elevation: 8,
-              shadowColor: '#000',
+              shadowColor: '#000000',
               shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.1,
               shadowRadius: 8,
@@ -212,15 +221,15 @@ export default function App() {
           </Tab.Screen>
 
           <Tab.Screen
-            name="Sharing"
+            name="Family"
             options={{
-              tabBarLabel: 'Premium',
+              tabBarLabel: 'Family',
               tabBarIcon: ({ color }) => (
-                <Ionicons name="star" size={24} color={color} />
+                <Ionicons name="people-circle" size={24} color={color} />
               ),
             }}
           >
-            {() => <LocationSharingScreen />}
+            {() => <FindMyFamilyScreen />}
           </Tab.Screen>
 
           <Tab.Screen

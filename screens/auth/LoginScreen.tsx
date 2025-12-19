@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
+} from 'react-native';
+import { getTheme } from '../../constants/theme';
 import authService from '../../services/authService';
 
 interface LoginScreenProps {
@@ -20,6 +22,10 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: LoginScreenProps) {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,7 +60,7 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
           <TextInput
             style={styles.input}
             placeholder={t('email')}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -66,7 +72,7 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
           <TextInput
             style={styles.input}
             placeholder={t('password')}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -82,7 +88,7 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
             accessibilityRole="button"
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={theme.colors.textInverse} />
             ) : (
               <Text style={styles.loginButtonText}>{t('login')}</Text>
             )}
@@ -108,10 +114,10 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   content: {
     flex: 1,
@@ -121,13 +127,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
     textAlign: 'center',
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 50,
   },
@@ -135,28 +141,25 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   input: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 18,
     fontSize: 16,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
+    color: theme.colors.text,
   },
   loginButton: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
     marginTop: 10,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    ...theme.shadows.small,
   },
   loginButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -165,7 +168,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   registerLinkText: {
-    color: '#E63946',
+    color: theme.colors.primary,
     fontSize: 14,
   },
   forgotPassword: {
@@ -173,7 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   forgotPasswordText: {
-    color: '#999',
+    color: theme.colors.textTertiary,
     fontSize: 14,
   },
 });

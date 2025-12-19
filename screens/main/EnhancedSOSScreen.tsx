@@ -6,24 +6,26 @@
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { Accelerometer } from 'expo-sensors';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    Vibration,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Vibration,
+  View,
+  useColorScheme
 } from 'react-native';
+import { getTheme } from '../../constants/theme';
 import emergencyService from '../../services/emergencyService';
 import firebaseHistoryService from '../../services/firebaseHistoryService';
 import locationService, { LocationData } from '../../services/locationService';
@@ -51,6 +53,9 @@ export default function EnhancedSOSScreen({
   userId,
 }: EnhancedSOSScreenProps) {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
   
   const [isPressed, setIsPressed] = useState(false);
   const [sosActivated, setSosActivated] = useState(false);
@@ -446,7 +451,7 @@ export default function EnhancedSOSScreen({
       if (!silentMode) {
         Alert.alert(
           'SOS Sent!',
-          `Emergency alerts sent to ${favoriteContacts.length} favorite contact(s) with your location, message${recordingUri ? ', and voice note' : ''}. They can track you in real-time.`,
+          `Emergency alerts sent to ${targetContacts.length} contact(s) with your location, message${recordingUri ? ', and voice note' : ''}. They can track you in real-time.`,
           [
             {
               text: 'Deactivate',
@@ -473,25 +478,6 @@ export default function EnhancedSOSScreen({
         type: 'SOS' as const,
         timestamp: Date.now(),
         message: message || 'Emergency!',
-        hasVoiceNote: !!voiceUri,
-        voiceRecordingUri: voiceUri,
-        location: location ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy || 0,
-        } : null,
-        contactsNotified: userContacts.length,
-        status: 'sent' as const,
-        silentMode,
-        networkStatus: isOnline ? 'online' as const : 'offline' as const,
-      };
-
-      await firebaseHistoryService.addEvent(event);
-      console.log('SOS Event logged to Firebase');
-    } catch (error) {
-      console.error('Error logging SOS event:', error);
-    }
-  };
         hasVoiceNote: !!voiceUri,
         voiceRecordingUri: voiceUri,
         location: location ? {
@@ -640,7 +626,7 @@ export default function EnhancedSOSScreen({
             <TextInput
               style={styles.messageInput}
               placeholder="e.g., 'At home, need help immediately'"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
               value={emergencyMessage}
               onChangeText={setEmergencyMessage}
               multiline
@@ -686,7 +672,7 @@ export default function EnhancedSOSScreen({
           <Switch
             value={silentMode}
             onValueChange={setSilentMode}
-            trackColor={{ false: '#ccc', true: '#E63946' }}
+            trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
             thumbColor="#fff"
           />
         </View>
@@ -702,7 +688,7 @@ export default function EnhancedSOSScreen({
             <Switch
               value={shakeEnabled}
               onValueChange={setShakeEnabled}
-              trackColor={{ false: '#ccc', true: '#E63946' }}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -719,7 +705,7 @@ export default function EnhancedSOSScreen({
             <Switch
               value={autoCall}
               onValueChange={setAutoCall}
-              trackColor={{ false: '#ccc', true: '#E63946' }}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -767,10 +753,10 @@ export default function EnhancedSOSScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -780,27 +766,28 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'web' ? 40 : 20,
   },
   header: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     padding: 24,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: theme.colors.textInverse,
+    opacity: 0.9,
   },
   offlineBanner: {
-    backgroundColor: '#FF9800',
+    backgroundColor: theme.colors.semantic.warning,
     padding: 12,
     alignItems: 'center',
   },
   offlineText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -822,7 +809,7 @@ const styles = StyleSheet.create({
     bottom: -12,
     borderRadius: (SOS_BUTTON_SIZE + 24) / 2,
     borderWidth: 8,
-    borderColor: 'rgba(230, 57, 70, 0.2)',
+    borderColor: theme.colors.primary + '33', // 20% opacity
     overflow: 'hidden',
   },
   progressFill: {
@@ -830,7 +817,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     height: '100%',
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
   },
   countdownContainer: {
     position: 'absolute',
@@ -843,7 +830,7 @@ const styles = StyleSheet.create({
   countdownText: {
     fontSize: 80,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -852,10 +839,10 @@ const styles = StyleSheet.create({
     width: SOS_BUTTON_SIZE,
     height: SOS_BUTTON_SIZE,
     borderRadius: SOS_BUTTON_SIZE / 2,
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#E63946',
+    shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
@@ -870,37 +857,34 @@ const styles = StyleSheet.create({
   sosText: {
     fontSize: Platform.OS === 'web' ? 48 : 72,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     letterSpacing: 4,
   },
   sosSubtext: {
     fontSize: Platform.OS === 'web' ? 14 : 20,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: theme.colors.textInverse,
     fontWeight: '600',
     marginTop: 8,
+    opacity: 0.9,
   },
   instruction: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
   },
   settingsContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   settingsTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 16,
   },
   settingRow: {
@@ -909,7 +893,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border,
   },
   settingInfo: {
     flex: 1,
@@ -917,62 +901,58 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   settingDescription: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   contactsSummary: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   contactsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   contactsCount: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
     marginBottom: 4,
   },
   contactsVerified: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: theme.colors.semantic.success,
   },
   noFavoritesWarning: {
     fontSize: 13,
-    color: '#FF9800',
+    color: theme.colors.semantic.warning,
     marginTop: 8,
     fontWeight: '600',
   },
   deactivateButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.semantic.success,
     marginHorizontal: 16,
     marginBottom: 32,
     padding: 18,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#4CAF50',
+    shadowColor: theme.colors.semantic.success,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
   deactivateButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -981,36 +961,32 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   messageCard: {
-    backgroundColor: '#FFF3CD',
+    backgroundColor: theme.colors.semantic.warning + '20', // 20% opacity
     borderRadius: 16,
     padding: 20,
     borderWidth: 2,
-    borderColor: '#FFC107',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: theme.colors.semantic.warning,
+    ...theme.shadows.medium,
   },
   messageCardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   messageCardSubtitle: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   messageInput: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
     minHeight: 80,
     maxHeight: 120,
     textAlignVertical: 'top',
@@ -1020,70 +996,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     padding: 8,
-    backgroundColor: '#FFE5E5',
+    backgroundColor: theme.colors.primary + '20',
     borderRadius: 8,
   },
   recordingDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     marginRight: 8,
   },
   recordingText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#E63946',
+    color: theme.colors.primary,
   },
   infoBanner: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.colors.blue[50],
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 16,
     padding: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
+    borderLeftColor: theme.colors.semantic.info,
   },
   infoBannerText: {
     fontSize: 14,
-    color: '#1565C0',
+    color: theme.colors.blue[800],
     lineHeight: 20,
   },
   webWarningBanner: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: theme.colors.semantic.error + '20',
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 16,
     padding: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#E63946',
+    borderLeftColor: theme.colors.semantic.error,
   },
   webWarningText: {
     fontSize: 14,
-    color: '#C62828',
+    color: theme.colors.semantic.error,
     lineHeight: 20,
     fontWeight: '500',
   },
   webFeaturesBanner: {
-    backgroundColor: '#F3E5F5',
+    backgroundColor: theme.colors.purple[50],
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#9C27B0',
+    borderLeftColor: theme.colors.purple[600],
   },
   webFeaturesTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#6A1B9A',
+    color: theme.colors.purple[800],
     marginBottom: 12,
   },
   webFeatureText: {
     fontSize: 13,
-    color: '#7B1FA2',
+    color: theme.colors.purple[700],
     marginVertical: 6,
     lineHeight: 18,
   },

@@ -22,7 +22,7 @@ class EmergencyService {
     userName: string
   ): Promise<boolean> {
     try {
-      const isOnline = await networkService.checkConnection();
+      const isOnline = await networkService.checkConnection() ?? false;
       let cloudSuccess = false;
 
       // 1. Try Cloud SMS (Automatic, Background) if online

@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  Dimensions,
-  RefreshControl,
-  TextInput,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    Dimensions,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
+} from 'react-native';
+import { getTheme } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -47,6 +49,10 @@ interface UserActivity {
 }
 
 export default function AdminDashboardScreen() {
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -175,11 +181,11 @@ export default function AdminDashboardScreen() {
 
   const getStatusColor = (status: SOSAlert['status']) => {
     switch (status) {
-      case 'pending': return '#FFA500';
-      case 'delivered': return '#4CAF50';
-      case 'resolved': return '#2196F3';
-      case 'failed': return '#F44336';
-      default: return '#999';
+      case 'pending': return theme.colors.warning;
+      case 'delivered': return theme.colors.success;
+      case 'resolved': return theme.colors.info;
+      case 'failed': return theme.colors.error;
+      default: return theme.colors.textTertiary;
     }
   };
 
@@ -202,33 +208,33 @@ export default function AdminDashboardScreen() {
   const renderOverview = () => (
     <View style={styles.overviewContainer}>
       <View style={styles.statsGrid}>
-        <View style={[styles.statCard, { backgroundColor: '#E3F2FD' }]}>
-          <Ionicons name="people" size={32} color="#1976D2" />
+        <View style={[styles.statCard, { backgroundColor: colorScheme === 'dark' ? theme.colors.card : '#E3F2FD' }]}>
+          <Ionicons name="people" size={32} color={theme.colors.info} />
           <Text style={styles.statValue}>{stats.totalUsers.toLocaleString()}</Text>
           <Text style={styles.statLabel}>Total Users</Text>
-          <Text style={[styles.statSubtext, { color: '#4CAF50' }]}>
+          <Text style={[styles.statSubtext, { color: theme.colors.success }]}>
             {stats.activeUsers} active
           </Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: '#FFF3E0' }]}>
-          <Ionicons name="alert-circle" size={32} color="#F57C00" />
+        <View style={[styles.statCard, { backgroundColor: colorScheme === 'dark' ? theme.colors.card : '#FFF3E0' }]}>
+          <Ionicons name="alert-circle" size={32} color={theme.colors.warning} />
           <Text style={styles.statValue}>{stats.totalSOSAlerts.toLocaleString()}</Text>
           <Text style={styles.statLabel}>Total Alerts</Text>
-          <Text style={[styles.statSubtext, { color: '#FF9800' }]}>
+          <Text style={[styles.statSubtext, { color: theme.colors.warning }]}>
             {stats.alertsToday} today
           </Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: '#E8F5E9' }]}>
-          <Ionicons name="checkmark-circle" size={32} color="#388E3C" />
+        <View style={[styles.statCard, { backgroundColor: colorScheme === 'dark' ? theme.colors.card : '#E8F5E9' }]}>
+          <Ionicons name="checkmark-circle" size={32} color={theme.colors.success} />
           <Text style={styles.statValue}>{stats.successRate}%</Text>
           <Text style={styles.statLabel}>Success Rate</Text>
           <Text style={styles.statSubtext}>Delivery success</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: '#F3E5F5' }]}>
-          <Ionicons name="time" size={32} color="#7B1FA2" />
+        <View style={[styles.statCard, { backgroundColor: colorScheme === 'dark' ? theme.colors.card : '#F3E5F5' }]}>
+          <Ionicons name="time" size={32} color={theme.colors.secondary} />
           <Text style={styles.statValue}>{stats.avgResponseTime}s</Text>
           <Text style={styles.statLabel}>Avg Response</Text>
           <Text style={styles.statSubtext}>Time to deliver</Text>
@@ -259,7 +265,7 @@ export default function AdminDashboardScreen() {
           placeholder="Search alerts..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textTertiary}
         />
         
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterButtons}>
@@ -459,13 +465,13 @@ export default function AdminDashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     padding: 20,
     paddingTop: Platform.OS === 'ios' ? 50 : 20,
     flexDirection: 'row',
@@ -475,14 +481,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
   },
   refreshButton: {
     padding: 8,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -500,15 +506,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#E63946',
+    borderBottomColor: theme.colors.primary,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   tabTextActive: {
-    color: '#E63946',
+    color: theme.colors.primary,
   },
   content: {
     flex: 1,
@@ -528,33 +534,35 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    ...theme.shadows.small,
   },
   statValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginTop: 8,
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   statSubtext: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginTop: 2,
   },
   chartPlaceholder: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 20,
     borderRadius: 12,
-    elevation: 2,
+    ...theme.shadows.small,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 16,
   },
   chartBars: {
@@ -570,27 +578,28 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: '60%',
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     borderRadius: 4,
   },
   barLabel: {
     fontSize: 10,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 8,
   },
   alertsContainer: {
     flex: 1,
   },
   filterBar: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     gap: 12,
   },
   searchInput: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
+    color: theme.colors.text,
   },
   filterButtons: {
     flexDirection: 'row',
@@ -599,29 +608,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     marginRight: 8,
   },
   filterButtonActive: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
   },
   filterButtonText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   filterButtonTextActive: {
-    color: '#fff',
+    color: theme.colors.textInverse,
   },
   alertsList: {
     padding: 16,
   },
   alertCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
+    ...theme.shadows.small,
   },
   alertHeader: {
     flexDirection: 'row',
@@ -640,11 +649,11 @@ const styles = StyleSheet.create({
   alertUserName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   alertUserId: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textTertiary,
   },
   alertStatus: {
     paddingHorizontal: 12,
@@ -667,7 +676,7 @@ const styles = StyleSheet.create({
   },
   alertDetailText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   alertActions: {
     flexDirection: 'row',
@@ -683,13 +692,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   resolveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.success,
   },
   investigateButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: theme.colors.info,
   },
   actionButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -698,7 +707,7 @@ const styles = StyleSheet.create({
   },
   userStats: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     gap: 16,
   },
@@ -709,22 +718,22 @@ const styles = StyleSheet.create({
   userStatValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
   },
   userStatLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   usersList: {
     padding: 16,
   },
   userCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
+    ...theme.shadows.small,
   },
   userHeader: {
     flexDirection: 'row',
@@ -735,12 +744,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   userAvatarText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -751,11 +760,11 @@ const styles = StyleSheet.create({
   userCardName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   userCardEmail: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginTop: 2,
   },
   subscriptionBadge: {
@@ -766,14 +775,14 @@ const styles = StyleSheet.create({
   subscriptionText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   userMetrics: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.colors.border,
   },
   userMetric: {
     alignItems: 'center',
@@ -781,11 +790,11 @@ const styles = StyleSheet.create({
   userMetricValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
   },
   userMetricLabel: {
     fontSize: 11,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginTop: 4,
   },
 });

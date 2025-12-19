@@ -1,13 +1,15 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import React, { useMemo } from 'react';
+import {
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { getTheme } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +25,9 @@ interface FeatureCard {
 
 const PremiumFeaturesScreen: React.FC = () => {
   const navigation = useNavigation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const features: FeatureCard[] = [
     {
@@ -32,7 +37,7 @@ const PremiumFeaturesScreen: React.FC = () => {
       description: 'Share your real-time location with trusted contacts via secure links',
       premium: true,
       screen: 'LocationSharing',
-      color: '#E63946',
+      color: theme.colors.primary,
     },
     {
       id: 'check-in',
@@ -41,7 +46,7 @@ const PremiumFeaturesScreen: React.FC = () => {
       description: 'Set timers and auto-alert contacts if you don\'t check in',
       premium: true,
       screen: 'CheckIn',
-      color: '#4CAF50',
+      color: theme.colors.success,
     },
     {
       id: 'fake-call',
@@ -50,7 +55,7 @@ const PremiumFeaturesScreen: React.FC = () => {
       description: 'Simulate incoming calls to escape uncomfortable situations',
       premium: true,
       screen: 'FakeCall',
-      color: '#FF9800',
+      color: theme.colors.warning,
     },
     {
       id: 'safe-zones',
@@ -68,7 +73,7 @@ const PremiumFeaturesScreen: React.FC = () => {
       description: 'Auto-record audio/video during emergencies, uploaded to cloud',
       premium: true,
       screen: 'PanicRecording',
-      color: '#F44336',
+      color: theme.colors.error,
     },
     {
       id: 'journey-tracking',
@@ -77,7 +82,7 @@ const PremiumFeaturesScreen: React.FC = () => {
       description: 'Track your route with breadcrumbs and share ETA with contacts',
       premium: true,
       screen: 'JourneyTracking',
-      color: '#2196F3',
+      color: theme.colors.info,
     },
     {
       id: 'ai-threat',
@@ -278,25 +283,25 @@ const PremiumFeaturesScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     padding: 20,
     paddingTop: 40,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.textInverse,
     opacity: 0.9,
     marginBottom: 15,
   },
@@ -309,12 +314,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pricingText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },
   pricingAmount: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -322,16 +327,12 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   statsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     flexDirection: 'row',
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   statItem: {
     flex: 1,
@@ -340,33 +341,29 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
     marginBottom: 5,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.border,
     marginHorizontal: 10,
   },
   featuresGrid: {
     gap: 12,
   },
   featureCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     marginBottom: 12,
+    ...theme.shadows.small,
   },
   featureIconContainer: {
     width: 50,
@@ -390,7 +387,7 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginRight: 8,
   },
   premiumBadge: {
@@ -406,7 +403,7 @@ const styles = StyleSheet.create({
   },
   featureDescription: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
     lineHeight: 18,
   },
   featureArrow: {
@@ -414,10 +411,10 @@ const styles = StyleSheet.create({
   },
   arrowIcon: {
     fontSize: 24,
-    color: '#ccc',
+    color: theme.colors.textTertiary,
   },
   valueCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.colors.neutral[900],
     borderRadius: 12,
     padding: 20,
     marginTop: 15,
@@ -426,7 +423,7 @@ const styles = StyleSheet.create({
   valueTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 15,
   },
   valueList: {
@@ -434,24 +431,20 @@ const styles = StyleSheet.create({
   },
   valueItem: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.colors.textInverse,
     lineHeight: 20,
   },
   techCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   techTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 15,
   },
   techGrid: {
@@ -464,16 +457,16 @@ const styles = StyleSheet.create({
   },
   techLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 5,
   },
   techValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#E63946',
+    color: theme.colors.primary,
   },
   useCaseCard: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.colors.blue[50],
     borderRadius: 12,
     padding: 20,
     marginBottom: 30,
@@ -481,7 +474,7 @@ const styles = StyleSheet.create({
   useCaseTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1976D2',
+    color: theme.colors.blue[700],
     marginBottom: 15,
   },
   useCaseList: {
@@ -493,13 +486,13 @@ const styles = StyleSheet.create({
   },
   useCaseBullet: {
     fontSize: 20,
-    color: '#1976D2',
+    color: theme.colors.blue[700],
     marginRight: 10,
   },
   useCaseText: {
     flex: 1,
     fontSize: 14,
-    color: '#0D47A1',
+    color: theme.colors.blue[900],
     lineHeight: 20,
   },
 });

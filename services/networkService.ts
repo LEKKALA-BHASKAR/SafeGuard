@@ -24,6 +24,9 @@ export interface QueuedAlert {
 }
 
 class NetworkService {
+  checkConnection() {
+    throw new Error('Method not implemented.');
+  }
   private networkStatus: NetworkStatus = {
     isConnected: false,
     isInternetReachable: false,

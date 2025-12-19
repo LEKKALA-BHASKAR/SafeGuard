@@ -5,15 +5,15 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    query,
-    setDoc,
-    updateDoc,
-    where,
-    writeBatch
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
@@ -126,7 +126,7 @@ class FirebaseContactsService {
   /**
    * Add new contact to Firebase
    */
-  async addContact(contact: Omit<EmergencyContact, 'id'>): Promise<string> {
+  async addContact(contact: Omit<EmergencyContact, 'id' | 'userId'>): Promise<string> {
     try {
       if (!auth.currentUser) {
         throw new Error('User not authenticated');
@@ -188,7 +188,7 @@ class FirebaseContactsService {
    * Toggle favorite status
    */
   async toggleFavorite(id: string, isFavorite: boolean): Promise<void> {
-    await this.updateContact(id, { favorite: !isFavorite });
+    await this.updateContact(id, { favorite: isFavorite });
   }
 
   /**

@@ -5,20 +5,22 @@
 
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useColorScheme
 } from 'react-native';
+import { getTheme } from '../../constants/theme';
 import authService, { UserProfile } from '../../services/authService';
 import otpService from '../../services/otpService';
 
@@ -29,6 +31,9 @@ interface ProfileScreenProps {
 
 export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScreenProps) {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,6 +85,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
 
       const updates: Partial<UserProfile> = {
         displayName,
+        phoneNumber,
         bloodGroup,
         allergies: allergies ? allergies.split(',').map(a => a.trim()) : [],
         medicalConditions: medicalConditions ? medicalConditions.split(',').map(m => m.trim()) : [],
@@ -87,12 +93,9 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
         updatedAt: Date.now(),
       };
 
-      // Check if phone number changed and needs verification
+      // Check if phone number changed
       if (phoneNumber !== profile?.phoneNumber) {
-        if (!profile?.phoneVerified) {
-          setShowOTPInput(true);
-          return;
-        }
+        updates.phoneVerified = false;
       }
 
       const success = await authService.updateUserProfile(userId, updates);
@@ -204,7 +207,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#E63946" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
@@ -247,7 +250,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
             value={displayName}
             onChangeText={setDisplayName}
             placeholder="Enter your full name"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
           />
         </View>
 
@@ -257,7 +260,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
             style={[styles.input, styles.inputDisabled]}
             value={profile?.email}
             editable={false}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
           />
           <Text style={styles.helperText}>Email cannot be changed</Text>
         </View>
@@ -271,9 +274,9 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
               onChangeText={setPhoneNumber}
               placeholder="+1234567890"
               keyboardType="phone-pad"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
             />
-            {profile?.phoneVerified ? (
+            {profile?.phoneVerified && phoneNumber === profile?.phoneNumber ? (
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedText}>✓ Verified</Text>
               </View>
@@ -286,7 +289,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
               </TouchableOpacity>
             )}
           </View>
-          {!profile?.phoneVerified && (
+          {(!profile?.phoneVerified || phoneNumber !== profile?.phoneNumber) && (
             <Text style={styles.helperText}>Phone verification required for emergency features</Text>
           )}
         </View>
@@ -302,7 +305,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
               placeholder="000000"
               keyboardType="number-pad"
               maxLength={6}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
             />
             <TouchableOpacity
               style={styles.verifyOtpButton}
@@ -331,7 +334,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
             value={bloodGroup}
             onChangeText={setBloodGroup}
             placeholder="e.g., O+, A-, AB+"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
           />
         </View>
 
@@ -343,7 +346,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
             onChangeText={setAllergies}
             placeholder="e.g., Penicillin, Peanuts (comma separated)"
             multiline
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
           />
         </View>
 
@@ -355,7 +358,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
             onChangeText={setMedicalConditions}
             placeholder="e.g., Diabetes, Asthma (comma separated)"
             multiline
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
           />
         </View>
 
@@ -368,7 +371,7 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
             placeholder="Additional information for emergency responders..."
             multiline
             numberOfLines={4}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
           />
         </View>
       </View>
@@ -391,36 +394,37 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   header: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     padding: 24,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: theme.colors.textInverse,
+    opacity: 0.9,
   },
   photoSection: {
     alignItems: 'center',
@@ -435,22 +439,22 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 4,
-    borderColor: '#fff',
+    borderColor: theme.colors.surface,
   },
   photoPlaceholder: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: '#fff',
+    borderColor: theme.colors.surface,
   },
   photoInitial: {
     fontSize: 40,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
   },
   photoEditBadge: {
     position: 'absolute',
@@ -459,36 +463,32 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.semantic.success,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#fff',
+    borderColor: theme.colors.surface,
   },
   photoEditText: {
     fontSize: 14,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 20,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 16,
   },
   inputGroup: {
@@ -497,21 +497,21 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
   },
   inputDisabled: {
-    backgroundColor: '#F0F0F0',
-    color: '#999',
+    backgroundColor: theme.colors.neutral[100],
+    color: theme.colors.textTertiary,
   },
   textArea: {
     minHeight: 100,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   phoneInputContainer: {
@@ -531,85 +531,82 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   verifiedBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.semantic.success,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
   },
   verifiedText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 12,
     fontWeight: '600',
   },
   verifyButton: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
   },
   verifyButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },
   otpContainer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: theme.colors.semantic.warning + '20', // 20% opacity
     borderRadius: 12,
   },
   otpLabel: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
     fontWeight: '500',
   },
   otpInput: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     padding: 16,
     fontSize: 24,
     textAlign: 'center',
     letterSpacing: 8,
     borderWidth: 1,
-    borderColor: '#FF9800',
+    borderColor: theme.colors.semantic.warning,
     marginBottom: 12,
+    color: theme.colors.text,
   },
   verifyOtpButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: theme.colors.semantic.warning,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 8,
   },
   verifyOtpButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },
   resendText: {
     fontSize: 14,
-    color: '#FF9800',
+    color: theme.colors.semantic.warning,
     textAlign: 'center',
     fontWeight: '500',
   },
   saveButton: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     marginHorizontal: 16,
     padding: 18,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#E63946',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...theme.shadows.medium,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: '600',
   },

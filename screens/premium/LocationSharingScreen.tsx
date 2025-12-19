@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  Switch,
-  TextInput,
-  Platform,
-  Share,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  Alert,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { getTheme } from '../../constants/theme';
 import locationSharingService, { LocationShare } from '../../services/locationSharingService';
-import enhancedLocationService from '../../services/enhancedLocationService';
 
 const LocationSharingScreen: React.FC = () => {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [activeShares, setActiveShares] = useState<LocationShare[]>([]);
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
@@ -153,7 +158,7 @@ const LocationSharingScreen: React.FC = () => {
           placeholder="Recipient Name *"
           value={recipientName}
           onChangeText={setRecipientName}
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textTertiary}
         />
 
         <TextInput
@@ -162,7 +167,7 @@ const LocationSharingScreen: React.FC = () => {
           value={recipientPhone}
           onChangeText={setRecipientPhone}
           keyboardType="phone-pad"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textTertiary}
         />
 
         <View style={styles.row}>
@@ -173,7 +178,7 @@ const LocationSharingScreen: React.FC = () => {
               value={duration}
               onChangeText={setDuration}
               keyboardType="number-pad"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
             />
           </View>
 
@@ -183,7 +188,7 @@ const LocationSharingScreen: React.FC = () => {
               <Switch
                 value={limitViews}
                 onValueChange={setLimitViews}
-                trackColor={{ false: '#ccc', true: '#E63946' }}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
               />
             </View>
             {limitViews && (
@@ -193,7 +198,7 @@ const LocationSharingScreen: React.FC = () => {
                 value={maxViews}
                 onChangeText={setMaxViews}
                 keyboardType="number-pad"
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textTertiary}
               />
             )}
           </View>
@@ -285,51 +290,48 @@ const LocationSharingScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   header: {
     padding: 20,
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.colors.textInverse,
     opacity: 0.9,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     margin: 15,
     padding: 20,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 15,
   },
   input: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: theme.colors.background,
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.colors.border,
+    color: theme.colors.text,
   },
   row: {
     flexDirection: 'row',
@@ -340,7 +342,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 5,
     fontWeight: '500',
   },
@@ -351,14 +353,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   createButton: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
   },
   createButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -368,17 +370,17 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 5,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textTertiary,
     textAlign: 'center',
   },
   shareItem: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.colors.border,
     paddingTop: 15,
     marginTop: 15,
   },
@@ -391,12 +393,12 @@ const styles = StyleSheet.create({
   shareName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
+    backgroundColor: theme.colors.semantic.success + '20',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -405,12 +407,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.semantic.success,
     marginRight: 5,
   },
   statusText: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: theme.colors.semantic.success,
     fontWeight: '500',
   },
   shareDetails: {
@@ -418,22 +420,22 @@ const styles = StyleSheet.create({
   },
   shareCode: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     marginBottom: 4,
   },
   shareTime: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   shareViews: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   shareLocation: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginBottom: 10,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
@@ -448,18 +450,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   extendButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.semantic.success,
   },
   stopButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: theme.colors.semantic.error,
   },
   actionButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },
   infoCard: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: theme.colors.semantic.warning + '20',
     margin: 15,
     padding: 20,
     borderRadius: 12,
@@ -468,12 +470,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#F57C00',
+    color: theme.colors.semantic.warning,
     marginBottom: 10,
   },
   infoItem: {
     fontSize: 14,
-    color: '#E65100',
+    color: theme.colors.semantic.warning,
     marginBottom: 5,
     lineHeight: 20,
   },

@@ -1,25 +1,30 @@
 
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  Platform,
-  Alert,
-  Share,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
+import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Platform,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { getTheme } from '../../constants/theme';
 import firebaseHistoryService, { EmergencyEvent } from '../../services/firebaseHistoryService';
 
 export default function EmergencyHistoryScreen() {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  
   const [events, setEvents] = useState<EmergencyEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -233,15 +238,15 @@ export default function EmergencyHistoryScreen() {
   const getStatusColor = (status: EmergencyEvent['status']) => {
     switch (status) {
       case 'sent':
-        return '#2196F3';
+        return theme.colors.info;
       case 'delivered':
-        return '#4CAF50';
+        return theme.colors.success;
       case 'failed':
-        return '#E63946';
+        return theme.colors.error;
       case 'queued':
-        return '#FF9800';
+        return theme.colors.warning;
       default:
-        return '#999';
+        return theme.colors.textSecondary;
     }
   };
 
@@ -304,7 +309,7 @@ export default function EmergencyHistoryScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#E63946" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading history...</Text>
       </View>
     );
@@ -377,10 +382,10 @@ export default function EmergencyHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   flatList: {
     flex: 1,
@@ -389,27 +394,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   header: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     padding: 24,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.textInverse,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: theme.colors.textInverse,
+    opacity: 0.9,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -418,25 +424,21 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...theme.shadows.small,
   },
   statValue: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   emptyContainer: {
@@ -452,12 +454,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 12,
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   listContent: {
@@ -465,15 +467,11 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   eventCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...theme.shadows.small,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -484,7 +482,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFE0E0',
+    backgroundColor: theme.colors.primary + '20', // 20% opacity
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -498,13 +496,13 @@ const styles = StyleSheet.create({
   eventType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 4,
     textTransform: 'capitalize',
   },
   eventDate: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -514,12 +512,12 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.textInverse,
     textTransform: 'uppercase',
   },
   eventDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: theme.colors.border,
     paddingTop: 12,
     marginBottom: 12,
   },
@@ -530,21 +528,21 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: theme.colors.text,
   },
   exportButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: theme.colors.info,
     padding: 12,
     borderRadius: 12,
     alignItems: 'center',
   },
   exportButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -553,18 +551,18 @@ const styles = StyleSheet.create({
     bottom: 16,
     left: 16,
     right: 16,
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.error,
     padding: 18,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#E63946',
+    shadowColor: theme.colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
   clearAllButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },

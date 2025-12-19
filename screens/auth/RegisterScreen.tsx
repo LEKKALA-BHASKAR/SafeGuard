@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
+} from 'react-native';
+import { getTheme } from '../../constants/theme';
 import authService from '../../services/authService';
 
 interface RegisterScreenProps {
@@ -21,6 +23,10 @@ interface RegisterScreenProps {
 
 export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }: RegisterScreenProps) {
   const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const theme = getTheme(colorScheme === 'dark');
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,7 +78,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
             <TextInput
               style={styles.input}
               placeholder={t('displayName')}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="words"
@@ -82,7 +88,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
             <TextInput
               style={styles.input}
               placeholder={t('email')}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -94,7 +100,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
             <TextInput
               style={styles.input}
               placeholder={t('password')}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -105,7 +111,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
             <TextInput
               style={styles.input}
               placeholder={t('confirmPassword')}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textTertiary}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
@@ -121,7 +127,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
               accessibilityRole="button"
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.colors.textInverse} />
               ) : (
                 <Text style={styles.registerButtonText}>{t('register')}</Text>
               )}
@@ -144,10 +150,10 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -161,13 +167,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#E63946',
+    color: theme.colors.primary,
     textAlign: 'center',
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
   },
@@ -175,28 +181,25 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   input: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 18,
     fontSize: 16,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
+    color: theme.colors.text,
   },
   registerButton: {
-    backgroundColor: '#E63946',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
     marginTop: 10,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    ...theme.shadows.small,
   },
   registerButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginLinkText: {
-    color: '#E63946',
+    color: theme.colors.primary,
     fontSize: 14,
   },
 });
