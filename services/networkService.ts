@@ -24,9 +24,6 @@ export interface QueuedAlert {
 }
 
 class NetworkService {
-  checkConnection() {
-    throw new Error('Method not implemented.');
-  }
   private networkStatus: NetworkStatus = {
     isConnected: false,
     isInternetReachable: false,
@@ -86,6 +83,14 @@ class NetworkService {
 
   /**
    * Check if device has internet connectivity
+   */
+  async checkConnection(): Promise<boolean> {
+    const state = await NetInfo.fetch();
+    return (state.isConnected && state.isInternetReachable) ?? false;
+  }
+
+  /**
+   * Check if device has internet connectivity (synchronous check based on last known state)
    */
   isOnline(): boolean {
     return this.networkStatus.isConnected && this.networkStatus.isInternetReachable !== false;

@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Battery from 'expo-battery';
+import * as Clipboard from 'expo-clipboard';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -16,8 +18,6 @@ import {
 import FamilyMap from '../../components/FamilyMap';
 import familyService, { FamilyGroup, FamilyMember } from '../../services/familyService';
 import locationService from '../../services/locationService';
-// import * as Clipboard from 'expo-clipboard';
-// import * as Battery from 'expo-battery';
 
 const { width, height } = Dimensions.get('window');
 
@@ -72,9 +72,8 @@ export default function FindMyFamilyScreen() {
     const location = await locationService.getCurrentLocation();
     let batteryLevel = undefined;
     try {
-      // TODO: Install expo-battery to enable battery level sharing
-      // const level = await Battery.getBatteryLevelAsync();
-      // batteryLevel = Math.round(level * 100);
+      const level = await Battery.getBatteryLevelAsync();
+      batteryLevel = Math.round(level * 100);
     } catch (e) {
       // Battery service might not be available
     }
@@ -88,9 +87,8 @@ export default function FindMyFamilyScreen() {
       setCurrentUserLocation(loc);
       let currentBattery = undefined;
       try {
-        // TODO: Install expo-battery to enable battery level sharing
-        // const level = await Battery.getBatteryLevelAsync();
-        // currentBattery = Math.round(level * 100);
+        const level = await Battery.getBatteryLevelAsync();
+        currentBattery = Math.round(level * 100);
       } catch (e) {}
       await familyService.updateLocation(loc, currentBattery);
     });
@@ -138,9 +136,8 @@ export default function FindMyFamilyScreen() {
 
   const copyInviteCode = async () => {
     if (familyGroup?.inviteCode) {
-      // TODO: Install expo-clipboard to enable this feature
-      // await Clipboard.setStringAsync(familyGroup.inviteCode);
-      Alert.alert('Info', 'Please use the Share button to share the code.');
+      await Clipboard.setStringAsync(familyGroup.inviteCode);
+      Alert.alert('Success', 'Invite code copied to clipboard!');
     }
   };
 

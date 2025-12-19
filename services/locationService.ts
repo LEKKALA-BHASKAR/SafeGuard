@@ -1,7 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const LOCATION_TRACKING_KEY = 'location_tracking_enabled';
@@ -76,6 +75,7 @@ class LocationService {
         return false;
       }
 
+      this.isTracking = true;
       this.locationSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
@@ -83,6 +83,8 @@ class LocationService {
           distanceInterval: 10, // Update every 10 meters
         },
         (location) => {
+          if (!this.isTracking) return;
+
           const locationData: LocationData = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
@@ -96,10 +98,10 @@ class LocationService {
         }
       );
 
-      this.isTracking = true;
       await AsyncStorage.setItem(LOCATION_TRACKING_KEY, 'true');
       return true;
     } catch (error) {
+      this.isTracking = false;
       console.error('Error starting foreground tracking:', error);
       return false;
     }
@@ -136,21 +138,25 @@ class LocationService {
 
   // Stop location tracking
   async stopTracking(): Promise<void> {
+    this.isTracking = false;
+    await AsyncStorage.setItem(LOCATION_TRACKING_KEY, 'false');
+
     try {
       if (this.locationSubscription) {
         this.locationSubscription.remove();
         this.locationSubscription = null;
       }
+    } catch (error) {
+      console.error('Error removing location subscription:', error);
+    }
 
+    try {
       const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
       if (isTaskRegistered) {
         await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
       }
-
-      this.isTracking = false;
-      await AsyncStorage.setItem(LOCATION_TRACKING_KEY, 'false');
     } catch (error) {
-      console.error('Error stopping tracking:', error);
+      console.error('Error stopping background updates:', error);
     }
   }
 
