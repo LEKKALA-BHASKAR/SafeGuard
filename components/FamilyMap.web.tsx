@@ -13,7 +13,7 @@ declare global {
   }
 }
 
-const FamilyMap = forwardRef<any, FamilyMapProps>(({ members, currentUserLocation }, ref) => {
+const FamilyMap = forwardRef<any, FamilyMapProps>(function FamilyMap({ members, currentUserLocation }, ref) {
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const mapContainerId = 'family-leaflet-map-container';

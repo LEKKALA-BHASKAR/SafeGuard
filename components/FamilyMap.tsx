@@ -8,7 +8,7 @@ interface FamilyMapProps {
   currentUserLocation: any;
 }
 
-const FamilyMap = forwardRef<MapView, FamilyMapProps>(({ members, currentUserLocation }, ref) => {
+const FamilyMap = forwardRef<MapView, FamilyMapProps>(function FamilyMap({ members, currentUserLocation }, ref) {
   return (
     <MapView
       ref={ref}
