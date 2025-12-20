@@ -1,5 +1,5 @@
 
-import * as FileSystem from 'expo-file-system/legacy';
+
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useState } from 'react';
@@ -151,6 +151,7 @@ export default function EmergencyHistoryScreen() {
         });
       } else {
         // For native, create a file and share
+        const FileSystem = require('expo-file-system');
         const fileName = `emergency-report-${event.id}.txt`;
         const filePath = `${FileSystem.documentDirectory}${fileName}`;
         

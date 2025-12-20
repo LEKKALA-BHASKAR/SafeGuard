@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { Platform } from 'react-native';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const LOCATION_TRACKING_KEY = 'location_tracking_enabled';
@@ -16,28 +17,30 @@ export interface LocationData {
 }
 
 // Define the background location task
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  if (error) {
-    console.error('Background location error:', error);
-    return;
-  }
-  if (data) {
-    const { locations } = data as any;
-    const location = locations[0];
-    
-    if (location) {
-      await saveLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        altitude: location.coords.altitude,
-        accuracy: location.coords.accuracy,
-        timestamp: location.timestamp,
-        speed: location.coords.speed,
-        heading: location.coords.heading,
-      });
+if (Platform.OS !== 'web') {
+  TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+    if (error) {
+      console.error('Background location error:', error);
+      return;
     }
-  }
-});
+    if (data) {
+      const { locations } = data as any;
+      const location = locations[0];
+      
+      if (location) {
+        await saveLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          altitude: location.coords.altitude,
+          accuracy: location.coords.accuracy,
+          timestamp: location.timestamp,
+          speed: location.coords.speed,
+          heading: location.coords.heading,
+        });
+      }
+    }
+  });
+}
 
 class LocationService {
   private locationSubscription: Location.LocationSubscription | null = null;
@@ -53,11 +56,13 @@ class LocationService {
         return false;
       }
 
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      
-      if (backgroundStatus !== 'granted') {
-        console.log('Background location permission denied');
-        return false;
+      if (Platform.OS !== 'web') {
+        const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+        
+        if (backgroundStatus !== 'granted') {
+          console.log('Background location permission denied');
+          return false;
+        }
       }
 
       return true;
@@ -109,6 +114,11 @@ class LocationService {
 
   // Start background location tracking
   async startBackgroundTracking(): Promise<boolean> {
+    if (Platform.OS === 'web') {
+      console.log('Background tracking not supported on web');
+      return false;
+    }
+
     try {
       const hasPermission = await this.requestPermissions();
       if (!hasPermission) {
@@ -150,13 +160,15 @@ class LocationService {
       console.error('Error removing location subscription:', error);
     }
 
-    try {
-      const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-      if (isTaskRegistered) {
-        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (Platform.OS !== 'web') {
+      try {
+        const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+        if (isTaskRegistered) {
+          await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        }
+      } catch (error) {
+        console.error('Error stopping background updates:', error);
       }
-    } catch (error) {
-      console.error('Error stopping background updates:', error);
     }
   }
 

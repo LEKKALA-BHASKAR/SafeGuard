@@ -9,19 +9,19 @@ import * as Location from 'expo-location';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useColorScheme,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useColorScheme,
 } from 'react-native';
 import { getTheme } from '../../constants/theme';
 import firebaseSafeZonesService, { SafeZone } from '../../services/firebaseSafeZonesService';
@@ -92,6 +92,8 @@ export default function SafeZonesScreen({ userId, currentLocation }: SafeZonesSc
   };
 
   const startGeofenceMonitoring = async () => {
+    if (Platform.OS === 'web') return;
+
     try {
       // Request location permissions
       const { status } = await Location.requestForegroundPermissionsAsync();

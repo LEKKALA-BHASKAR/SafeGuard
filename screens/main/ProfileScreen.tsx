@@ -80,7 +80,9 @@ export default function ProfileScreen({ userId, onProfileUpdated }: ProfileScree
 
   const handleSaveProfile = async () => {
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
       setSaving(true);
 
       const updates: Partial<UserProfile> = {
