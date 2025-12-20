@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  View,
-  Text,
+  Alert,
+  Platform,
+  ScrollView,
   StyleSheet,
   Switch,
+  Text,
   TouchableOpacity,
-  ScrollView,
-  Alert,
-  TextInput,
+  View
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { saveLanguage } from '../../services/i18n';
 import authService from '../../services/authService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveLanguage } from '../../services/i18n';
 
 const PRIVACY_SETTINGS_KEY = 'privacy_settings';
 
@@ -87,21 +87,49 @@ export default function SettingsScreen({ onLogout }: SettingsScreenProps) {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
+    if (Platform.OS === 'web') {
+      // Web: Use native confirm dialog
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) {
+        (async () => {
+          try {
+            console.log('Logging out...');
             await authService.logout();
+            console.log('Auth service logout complete');
             onLogout();
+            console.log('onLogout callback executed');
+          } catch (error) {
+            console.error('Logout failed:', error);
+            window.alert('Failed to logout. Please try again.');
+          }
+        })();
+      }
+    } else {
+      // Native: Use Alert.alert
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: t('cancel'), style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                console.log('Logging out...');
+                await authService.logout();
+                console.log('Auth service logout complete');
+                onLogout();
+                console.log('onLogout callback executed');
+              } catch (error) {
+                console.error('Logout failed:', error);
+                Alert.alert('Error', 'Failed to logout. Please try again.');
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleDeleteAccount = () => {

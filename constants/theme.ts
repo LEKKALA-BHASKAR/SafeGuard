@@ -88,6 +88,10 @@ export const lightTheme = {
     
     // Semantic colors
     ...premiumColors.semantic,
+    semantic: premiumColors.semantic,
+    blue: premiumColors.blue,
+    purple: premiumColors.purple,
+    neutral: premiumColors.neutral,
     
     // Component-specific colors
     avatar: {
@@ -160,6 +164,16 @@ export const darkTheme = {
     warning: '#FBBF24',
     error: '#F87171',
     info: '#60A5FA',
+    
+    semantic: {
+      success: '#34D399',
+      warning: '#FBBF24',
+      error: '#F87171',
+      info: '#60A5FA',
+    },
+    blue: premiumColors.blue,
+    purple: premiumColors.purple,
+    neutral: premiumColors.neutral,
     
     // Component-specific colors
     avatar: {

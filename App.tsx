@@ -59,6 +59,7 @@ export default function App() {
 
     // Check authentication status
     const unsubscribe = authService.initAuthListener(async (user) => {
+      console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
       if (user) {
         setIsAuthenticated(true);
         setUserName(user.displayName || 'User');
@@ -71,6 +72,7 @@ export default function App() {
         }
       } else {
         setIsAuthenticated(false);
+        setUserName('User');
         setUserId('');
       }
       setLoading(false);

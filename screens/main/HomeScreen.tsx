@@ -1,18 +1,18 @@
 import * as Location from 'expo-location';
-import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import MapComponent from '../../components/MapComponent';
 import locationService, { LocationData } from '../../services/locationService';
@@ -107,7 +107,9 @@ export default function HomeScreen({ userName }: HomeScreenProps) {
             const mappedAddress: any = {
               street: data.address.road || data.address.street || null,
               city: data.address.city || data.address.town || data.address.village || null,
-              region: data.address.state || data.address.county || null,
+              region: data.address.state || null,
+              subregion: data.address.county || null,
+              district: data.address.suburb || data.address.neighbourhood || data.address.district || null,
               postalCode: data.address.postcode || null,
               country: data.address.country || null,
               name: data.display_name?.split(',')[0] || null,
@@ -157,25 +159,83 @@ export default function HomeScreen({ userName }: HomeScreenProps) {
 
   const shareLocation = async () => {
     if (!location) {
-      Alert.alert('No Location', 'Location data not available');
+      if (Platform.OS === 'web') {
+        window.alert('Location data not available');
+      } else {
+        Alert.alert('No Location', 'Location data not available');
+      }
       return;
     }
 
-    const addressText = address
-      ? `${address.street || ''} ${address.name || ''}\n${address.city || ''}, ${address.region || ''} ${address.postalCode || ''}\n${address.country || ''}`
-      : 'Address not available';
+    // Construct a detailed address string
+    let addressDetails = 'Address not available';
+    if (address) {
+      const parts = [];
+      // Add name/street
+      if (address.name && address.name !== address.street) parts.push(address.name);
+      if (address.street) parts.push(address.street);
+      
+      // Add city/district
+      const cityPart = address.city || address.subregion || address.district;
+      if (cityPart) parts.push(cityPart);
+      
+      // Add region/state
+      if (address.region) parts.push(address.region);
+      
+      // Add postal code
+      if (address.postalCode) parts.push(address.postalCode);
+      
+      // Add country
+      if (address.country) parts.push(address.country);
+      
+      addressDetails = parts.join(', ');
+    }
 
-    const locationText = `📍 Current Location\n\n${addressText}\n\nCoordinates:\nLatitude: ${location.latitude.toFixed(6)}\nLongitude: ${location.longitude.toFixed(6)}\nAccuracy: ${location.accuracy?.toFixed(0) || 'N/A'}m\n\nGoogle Maps: https://maps.google.com/?q=${location.latitude},${location.longitude}\n\nShared via SafeGuard at ${new Date().toLocaleString()}`;
+    const mapLink = `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
+    
+    const message = `📍 My Current Location
+
+ADDRESS:
+${addressDetails}
+
+COORDINATES:
+${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}
+(Accuracy: ${location.accuracy?.toFixed(0) || 'N/A'}m)
+
+🔗 VIEW ON MAP:
+${mapLink}
+
+Sent via SafeGuard App`;
 
     try {
       if (Platform.OS === 'web') {
-        // Web: Use fallback approach that works reliably
+        // Web: Try native Web Share API first (shows app-wise share options)
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({
+              title: 'My Current Location',
+              text: message,
+              url: mapLink,
+            });
+            console.log('Shared successfully via Web Share API');
+            return;
+          } catch (shareError: any) {
+            // User cancelled or share not supported
+            if (shareError.name === 'AbortError') {
+              console.log('Share cancelled by user');
+              return;
+            }
+            console.log('Web Share API failed, falling back to clipboard:', shareError);
+          }
+        }
+
+        // Fallback: Copy to clipboard
         let copySuccess = false;
         
         // Method 1: Try modern clipboard API
         try {
           if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(locationText);
+            await navigator.clipboard.writeText(message);
             copySuccess = true;
             console.log('Copied using Clipboard API');
           }
@@ -187,7 +247,7 @@ export default function HomeScreen({ userName }: HomeScreenProps) {
         if (!copySuccess && typeof document !== 'undefined') {
           try {
             const textarea = document.createElement('textarea');
-            textarea.value = locationText;
+            textarea.value = message;
             textarea.style.position = 'fixed';
             textarea.style.top = '0';
             textarea.style.left = '0';
@@ -216,34 +276,49 @@ export default function HomeScreen({ userName }: HomeScreenProps) {
 
         // Show result
         if (copySuccess) {
-          Alert.alert('✅ Copied!', 'Location details copied to clipboard. You can paste it anywhere.');
+          window.alert('✅ Location copied to clipboard!\n\nYou can now paste it in WhatsApp, Gmail, or any other app.');
         } else {
-          // Last resort: Show location in alert
-          Alert.alert(
-            '📍 Location Details',
-            'Copy the location details below:\n\n' + locationText,
-            [{ text: 'OK', style: 'default' }]
+          // Last resort: Show location in a copyable alert
+          const copyText = window.prompt(
+            '📍 Location Details (Select All & Copy):\n\n',
+            message
           );
         }
       } else {
         // Mobile: Use native share
         try {
-          const isAvailable = await Sharing.isAvailableAsync();
-          if (isAvailable) {
-            await Sharing.shareAsync('data:text/plain;base64,' + btoa(locationText), {
-              mimeType: 'text/plain',
-              dialogTitle: 'Share Location',
-            });
-          } else {
-            Alert.alert('Share Location', locationText);
+          // iOS: When both message and url are provided, only url is shared
+          // So we combine them in the message
+          const shareContent = Platform.OS === 'ios' 
+            ? { message: `${message}` }
+            : { message: message, title: 'My Current Location' };
+          
+          const result = await Share.share(shareContent, {
+            dialogTitle: 'Share Location', // Android
+            subject: 'My Current Location', // iOS/Android email subject
+          });
+          
+          if (result.action === Share.sharedAction) {
+            if (result.activityType) {
+              console.log('Shared via', result.activityType);
+            } else {
+              console.log('Shared successfully');
+            }
+          } else if (result.action === Share.dismissedAction) {
+            console.log('Share dismissed');
           }
         } catch (shareError) {
-          Alert.alert('Share Location', locationText);
+          console.error('Share error:', shareError);
+          Alert.alert('Error', 'Failed to open share options. Please try again.');
         }
       }
     } catch (error) {
       console.error('Error sharing location:', error);
-      Alert.alert('📍 Location Details', locationText);
+      if (Platform.OS === 'web') {
+        window.alert('Error sharing location. Please try again.');
+      } else {
+        Alert.alert('📍 Location Details', message);
+      }
     }
   };
 

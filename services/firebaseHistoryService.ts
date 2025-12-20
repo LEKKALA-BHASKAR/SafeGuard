@@ -131,8 +131,7 @@ class FirebaseHistoryService {
 
       const eventsQuery = query(
         collection(db, COLLECTION_NAME),
-        where('userId', '==', userId),
-        orderBy('timestamp', 'desc')
+        where('userId', '==', userId)
       );
 
       const snapshot = await getDocs(eventsQuery);
@@ -144,6 +143,9 @@ class FirebaseHistoryService {
           ...doc.data(),
         } as EmergencyEvent);
       });
+
+      // Sort by timestamp descending (client-side to avoid composite index requirement)
+      events.sort((a, b) => b.timestamp - a.timestamp);
 
       this.localCache = events;
       return events;

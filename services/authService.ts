@@ -1,14 +1,14 @@
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  User,
-  updateProfile,
-} from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    createUserWithEmailAndPassword,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile,
+    User,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import encryptionService from './encryptionService';
 
 export interface UserProfile {
@@ -170,9 +170,19 @@ class AuthService {
   // Logout user
   async logout(): Promise<void> {
     try {
-      await signOut(auth);
+      console.log('Starting logout process...');
+      
+      // Clear AsyncStorage
       await AsyncStorage.removeItem('user_logged_in');
+      console.log('Cleared AsyncStorage');
+      
+      // Sign out from Firebase
+      await signOut(auth);
+      console.log('Signed out from Firebase');
+      
+      // Clear current user
       this.currentUser = null;
+      console.log('Logout completed successfully');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;

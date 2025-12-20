@@ -23,6 +23,7 @@ import { auth, db } from '../config/firebase';
 
 const SAFE_ZONES_KEY = 'safe_zones';
 const COLLECTION_NAME = 'safe_zones';
+const CACHE_KEY = 'safe_zones_cache';
 
 export interface SafeZone {
   id: string;
@@ -125,8 +126,7 @@ class FirebaseSafeZonesService {
 
       const zonesQuery = query(
         collection(db, COLLECTION_NAME),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', userId)
       );
 
       const snapshot = await getDocs(zonesQuery);
@@ -139,11 +139,24 @@ class FirebaseSafeZonesService {
         } as SafeZone);
       });
 
+      // Sort by createdAt descending (client-side to avoid composite index requirement)
+      zones.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt || 0));
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt || 0));
+        return timeB - timeA;
+      });
+
       this.localCache = zones;
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(zones));
       return zones;
     } catch (error) {
       console.error('Error fetching safe zones:', error);
       // Return cached data if available
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        this.localCache = JSON.parse(cached);
+        return this.localCache;
+      }
       return this.localCache;
     }
   }
@@ -172,8 +185,11 @@ class FirebaseSafeZonesService {
         id: docRef.id,
         ...zone,
         userId,
+        createdAt: Date.now(), // Use local timestamp for immediate cache
+        updatedAt: Date.now(),
       };
       this.localCache = [newZone, ...this.localCache];
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(this.localCache));
 
       return docRef.id;
     } catch (error) {
@@ -199,7 +215,9 @@ class FirebaseSafeZonesService {
         this.localCache[index] = {
           ...this.localCache[index],
           ...updates,
+          updatedAt: Date.now(),
         };
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(this.localCache));
       }
     } catch (error) {
       console.error('Error updating safe zone:', error);
@@ -216,6 +234,7 @@ class FirebaseSafeZonesService {
 
       // Update local cache
       this.localCache = this.localCache.filter((z) => z.id !== zoneId);
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(this.localCache));
     } catch (error) {
       console.error('Error deleting safe zone:', error);
       throw error;
@@ -292,7 +311,16 @@ class FirebaseSafeZonesService {
    * Get cached zones (offline support)
    */
   getCachedZones(): SafeZone[] {
+    // If local cache is empty, try to load from AsyncStorage synchronously? 
+    // No, AsyncStorage is async. We rely on initialize() or getUserZones() to populate localCache.
     return this.localCache;
+  }
+
+  /**
+   * Toggle safe zone enabled status
+   */
+  async toggleZone(zoneId: string, enabled: boolean): Promise<void> {
+    await this.updateZone(zoneId, { enabled });
   }
 
   /**
