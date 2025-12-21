@@ -146,6 +146,8 @@ class AuthService {
     password: string
   ): Promise<{ success: boolean; error?: string; user?: User }> {
     try {
+      console.log('[iOS Auth] Starting login process...');
+      
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
@@ -153,13 +155,19 @@ class AuthService {
       );
 
       const user = userCredential.user;
+      console.log('[iOS Auth] Firebase login successful for user:', user.uid);
 
       // Store user session
       await AsyncStorage.setItem('user_logged_in', 'true');
+      console.log('[iOS Auth] User session stored in AsyncStorage');
+      
+      // Update last login time
+      await this.updateLastLogin(user.uid);
+      console.log('[iOS Auth] Last login time updated');
 
       return { success: true, user };
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('[iOS Auth] Login error:', error);
       return {
         success: false,
         error: this.getErrorMessage(error.code),

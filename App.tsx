@@ -5,11 +5,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import {
-  Platform,
-  StatusBar,
-  StyleSheet,
-  View,
-  useColorScheme
+    Platform,
+    StatusBar,
+    StyleSheet,
+    View,
+    useColorScheme
 } from 'react-native';
 import { getTheme } from './constants/theme';
 import { EnhancedEmergencyContact } from './screens/main/EnhancedContactsScreen';
@@ -47,39 +47,55 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    initializeApp();
-  }, []);
+    let unsubscribe: (() => void) | undefined;
 
-  const initializeApp = async () => {
-    // Initialize network service
-    await networkService.initialize();
-    
-    // Load saved language
-    await loadSavedLanguage();
+    const initializeApp = async () => {
+      try {
+        // Initialize network service
+        await networkService.initialize();
+        
+        // Load saved language
+        await loadSavedLanguage();
 
-    // Check authentication status
-    const unsubscribe = authService.initAuthListener(async (user) => {
-      console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
-      if (user) {
-        setIsAuthenticated(true);
-        setUserName(user.displayName || 'User');
-        setUserId(user.uid);
+        // Check authentication status
+        unsubscribe = authService.initAuthListener(async (user) => {
+          console.log('[iOS Auth] Auth state changed:', user ? `User logged in: ${user.uid}` : 'User logged out');
+          
+          if (user) {
+            console.log('[iOS Auth] Setting authenticated state for user:', user.displayName);
+            setIsAuthenticated(true);
+            setUserName(user.displayName || 'User');
+            setUserId(user.uid);
 
-        // Load user profile
-        const profile = await authService.getUserProfile(user.uid);
-        if (profile) {
-          // Profile loaded
-        }
-      } else {
-        setIsAuthenticated(false);
-        setUserName('User');
-        setUserId('');
+            // Load user profile
+            const profile = await authService.getUserProfile(user.uid);
+            if (profile) {
+              console.log('[iOS Auth] Profile loaded successfully');
+            }
+          } else {
+            console.log('[iOS Auth] Clearing authenticated state');
+            setIsAuthenticated(false);
+            setUserName('User');
+            setUserId('');
+          }
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('[iOS Auth] Initialization error:', error);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return unsubscribe;
-  };
+    initializeApp();
+
+    // Cleanup on unmount
+    return () => {
+      if (unsubscribe) {
+        console.log('[iOS Auth] Cleaning up auth listener');
+        unsubscribe();
+      }
+    };
+  }, []);
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
